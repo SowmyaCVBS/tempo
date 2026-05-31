@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tempo</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root{
+  --bg:#0a0d13; --panel:#11161f; --panel-2:#0e131b; --line:#222a37; --line-soft:#1a212c;
+  --txt:#e7ecf4; --muted:#8a94a6; --muted-2:#5d6675;
+  --green:#2bd07a; --orange:#f5933b; --yellow:#eab308; --grey:#9aa6b8; --red:#f15b5b; --accent:#6ea8ff;
+  --shadow:0 10px 40px rgba(0,0,0,.45);
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --disp:'Bricolage Grotesque','Trebuchet MS',system-ui,sans-serif;
+  --body:'Bricolage Grotesque',system-ui,-apple-system,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:
+    radial-gradient(900px 500px at 12% -8%, rgba(110,168,255,.10), transparent 60%),
+    radial-gradient(800px 520px at 95% 0%, rgba(43,208,122,.07), transparent 55%),
+    var(--bg);
+  color:var(--txt);font-family:var(--body);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;
+  padding:22px clamp(14px,4vw,40px) 60px;
+}
+.wrap{max-width:920px;margin:0 auto}
+
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:40px;height:40px;border-radius:11px;flex:none;background:linear-gradient(150deg,#1b2433,#0d1118);border:1px solid var(--line);display:grid;place-items:center;position:relative;overflow:hidden}
+.logo::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent 46%,rgba(110,168,255,.5) 50%,transparent 54%);animation:sweep 3.2s ease-in-out infinite}
+@keyframes sweep{0%,70%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
+.logo b{font-family:var(--mono);font-size:19px;color:var(--accent);z-index:1}
+.brand h1{font-family:var(--disp);font-weight:800;font-size:25px;letter-spacing:-.5px;line-height:1}
+.brand p{color:var(--muted);font-size:12.5px;margin-top:3px}
+.headright{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.stats{display:flex;gap:8px;flex-wrap:wrap}
+.stat{background:var(--panel);border:1px solid var(--line-soft);border-radius:11px;padding:7px 12px;text-align:center;min-width:74px}
+.stat .n{font-family:var(--mono);font-weight:700;font-size:18px;line-height:1}
+.stat .l{color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;margin-top:3px}
+
+/* sync pill */
+.syncwrap{position:relative}
+.pill{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11.5px;border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:20px;padding:6px 12px;cursor:pointer;transition:.15s}
+.pill:hover{border-color:#36465c}
+.pill .led{width:8px;height:8px;border-radius:50%;background:var(--muted-2);transition:.2s}
+.pill.ok .led{background:var(--green);box-shadow:0 0 8px rgba(43,208,122,.6)}
+.pill.busy .led{background:var(--accent);box-shadow:0 0 8px rgba(110,168,255,.6);animation:pulse 1s ease-in-out infinite}
+.pill.bad .led{background:var(--red);box-shadow:0 0 8px rgba(241,91,91,.6)}
+@keyframes pulse{50%{opacity:.35}}
+.menu{position:absolute;right:0;top:38px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;min-width:200px;z-index:40;display:none}
+.menu.on{display:block}
+.menu button{width:100%;text-align:left;background:none;border:none;color:var(--txt);font-family:var(--body);font-size:13px;padding:9px 11px;border-radius:8px;cursor:pointer}
+.menu button:hover{background:#161d28}
+.menu .sep{height:1px;background:var(--line-soft);margin:5px 4px}
+.menu .danger{color:var(--red)}
+
+.bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.parkbox{flex:1;min-width:240px;display:flex;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:6px 6px 6px 14px;align-items:center}
+.parkbox .ic{color:var(--yellow);font-size:15px}
+.parkbox input{flex:1;background:none;border:none;color:var(--txt);font-family:var(--body);font-size:14px;outline:none}
+.parkbox input::placeholder{color:var(--muted-2)}
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--txt);font-family:var(--body);font-weight:600;font-size:13.5px;border-radius:11px;padding:10px 15px;cursor:pointer;transition:.15s;white-space:nowrap;display:inline-flex;align-items:center;gap:7px}
+.btn:hover{border-color:#36465c;background:#161d28;transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn.primary{background:linear-gradient(160deg,#3b82f6,#1d4ed8);border-color:#2563eb;color:#fff;box-shadow:0 6px 20px rgba(37,99,235,.3)}
+.btn.primary:hover{background:linear-gradient(160deg,#4b8ef8,#2257e0)}
+.btn.ghost{background:none}
+.btn.sm{padding:6px 11px;font-size:12.5px;border-radius:9px}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+.tabs{display:flex;gap:4px;background:var(--panel-2);border:1px solid var(--line-soft);border-radius:12px;padding:4px;margin-bottom:16px;width:fit-content}
+.tab{border:none;background:none;color:var(--muted);font-family:var(--body);font-weight:600;font-size:13.5px;padding:8px 16px;border-radius:9px;cursor:pointer;transition:.15s}
+.tab.on{background:var(--panel);color:var(--txt);box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.tab .c{font-family:var(--mono);font-size:11px;color:var(--muted-2);margin-left:5px}
+
+.section{margin-bottom:14px;animation:rise .4s ease both}
+.shead{display:flex;align-items:center;gap:10px;cursor:pointer;padding:6px 2px;user-select:none}
+.shead .dot{flex:none}
+.shead h2{font-family:var(--disp);font-weight:700;font-size:14px;letter-spacing:.2px}
+.shead .cnt{font-family:var(--mono);font-size:11.5px;color:var(--muted-2);background:var(--panel);border:1px solid var(--line-soft);padding:1px 8px;border-radius:20px}
+.shead .est{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.shead .car{color:var(--muted-2);transition:.2s;font-size:11px}
+.section.collapsed .car{transform:rotate(-90deg)}
+.section.collapsed .slist{display:none}
+.slist{margin-top:6px;display:flex;flex-direction:column;gap:7px}
+
+.dot{width:13px;height:13px;border-radius:50%;flex:none;display:inline-block}
+.dot.progress{background:var(--green);box-shadow:0 0 10px rgba(43,208,122,.5)}
+.dot.next{background:var(--orange);box-shadow:0 0 10px rgba(245,147,59,.45)}
+.dot.help{background:var(--yellow)}
+.dot.team{background:#2c3543;border:1.5px solid #56627a}
+.dot.idea{background:transparent;border:2px solid var(--red)}
+.dot.lagging{background:var(--red);box-shadow:0 0 10px rgba(241,91,91,.5)}
+.dot.done{background:#3a4452}
+
+.task{background:var(--panel);border:1px solid var(--line-soft);border-radius:12px;padding:11px 13px;display:flex;align-items:flex-start;gap:11px;transition:.15s;position:relative}
+.task:hover{border-color:#2c3848}
+.task.sub{margin-left:26px;background:var(--panel-2)}
+.task.isdone .ttl{color:var(--muted-2);text-decoration:line-through}
+.task.pinned{border-color:#3a557e;box-shadow:inset 2px 0 0 var(--accent)}
+.check{width:19px;height:19px;border-radius:6px;border:1.8px solid #3a4556;flex:none;margin-top:1px;cursor:pointer;transition:.15s;display:grid;place-items:center;background:none}
+.check:hover{border-color:var(--green)}
+.check.on{background:var(--green);border-color:var(--green)}
+.check.on::after{content:"\2713";color:#06210f;font-weight:800;font-size:12px}
+.tmain{flex:1;min-width:0}
+.ttl{font-size:14px;line-height:1.35;word-break:break-word}
+.ttl .pin{color:var(--accent);font-size:11px;margin-right:5px}
+.tmeta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:7px}
+.chip{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--panel-2);border:1px solid var(--line-soft);padding:2px 8px;border-radius:7px;cursor:pointer;transition:.12s}
+.chip:hover{border-color:#3a4556;color:var(--txt)}
+.chip.est{color:#cdd5e3}
+.chip a{color:var(--accent);text-decoration:none}
+.ref-tag{font-family:var(--mono);font-size:10px;color:var(--muted-2);border:1px solid var(--line-soft);padding:1px 6px;border-radius:6px}
+select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2);color:var(--muted);border:1px solid var(--line-soft);border-radius:7px;padding:2px 6px;cursor:pointer;outline:none}
+.progwrap{display:flex;align-items:center;gap:7px}
+.ring{--p:0;width:20px;height:20px;border-radius:50%;flex:none;background:conic-gradient(var(--green) calc(var(--p)*1%),#222a37 0);-webkit-mask:radial-gradient(circle 6px at center,transparent 98%,#000);mask:radial-gradient(circle 6px at center,transparent 98%,#000)}
+.subcount{font-family:var(--mono);font-size:10.5px;color:var(--muted-2)}
+.expand{margin-left:auto;align-self:center}
+.caret{color:var(--muted-2);cursor:pointer;font-size:11px;padding:4px;transition:.2s}
+.task.open .caret{transform:rotate(180deg)}
+.firststep{margin:8px 0 2px;background:rgba(110,168,255,.07);border:1px solid rgba(110,168,255,.18);border-radius:9px;padding:8px 11px;font-size:12.5px;color:#c6d4ec}
+.firststep b{color:var(--accent);font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:2px}
+.addrow input{flex:1;background:var(--panel-2);border:1px dashed var(--line);border-radius:9px;padding:8px 11px;color:var(--txt);font-family:var(--body);font-size:13px;outline:none;margin-left:26px;width:calc(100% - 26px)}
+
+.parked-card{background:var(--panel);border:1px solid var(--line-soft);border-left:3px solid var(--yellow);border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:7px;animation:rise .3s ease both;flex-wrap:wrap}
+.parked-card .pt{flex:1;font-size:13.5px;min-width:160px}
+.parked-card .when{font-family:var(--mono);font-size:10.5px;color:var(--muted-2)}
+
+.empty{text-align:center;padding:46px 20px;color:var(--muted)}
+.empty .big{font-family:var(--disp);font-weight:700;font-size:17px;color:var(--txt);margin-bottom:6px}
+.empty p{font-size:13.5px;max-width:360px;margin:0 auto 16px}
+
+.overlay{position:fixed;inset:0;background:rgba(5,7,11,.82);backdrop-filter:blur(7px);z-index:50;display:none;align-items:center;justify-content:center;padding:20px;animation:fade .2s ease}
+.overlay.on{display:flex}
+.focus{width:100%;max-width:540px;background:linear-gradient(180deg,#131a25,#0d121a);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:30px 28px;position:relative;animation:pop .3s cubic-bezier(.2,.9,.3,1.2) both}
+.focus .kicker{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.focus h2{font-family:var(--disp);font-weight:800;font-size:23px;line-height:1.2;letter-spacing:-.4px;margin-bottom:6px}
+.focus .ctx{color:var(--muted);font-size:13px;margin-bottom:20px}
+.timer{display:flex;align-items:baseline;gap:11px;justify-content:center;background:var(--panel-2);border:1px solid var(--line-soft);border-radius:14px;padding:18px;margin-bottom:18px}
+.timer .clock{font-family:var(--mono);font-weight:700;font-size:42px;letter-spacing:1px}
+.timer .clock.over{color:var(--orange)}
+.timer .tgt{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.focus .steps{margin-bottom:20px;display:flex;flex-direction:column;gap:8px}
+.focus .step{display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--line-soft);border-radius:10px;padding:10px 12px;font-size:13.5px}
+.focus .fbtns{display:flex;gap:9px;flex-wrap:wrap}
+.focus .fbtns .btn{flex:1;justify-content:center;min-width:120px}
+.xclose{position:absolute;top:16px;right:18px;color:var(--muted-2);cursor:pointer;font-size:20px;background:none;border:none;line-height:1}
+.xclose:hover{color:var(--txt)}
+
+/* connect screen */
+.connect{width:100%;max-width:540px;background:linear-gradient(180deg,#131a25,#0d121a);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:30px 28px;animation:pop .3s cubic-bezier(.2,.9,.3,1.2) both}
+.connect .kicker{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px}
+.connect h2{font-family:var(--disp);font-weight:800;font-size:22px;margin-bottom:6px}
+.connect .lede{color:var(--muted);font-size:13px;margin-bottom:18px}
+.connect label{display:block;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:0 0 6px}
+.connect input{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:11px 13px;color:var(--txt);font-family:var(--mono);font-size:13px;outline:none;margin-bottom:14px}
+.connect input:focus{border-color:var(--accent)}
+.adv{border-top:1px solid var(--line-soft);margin-top:4px;padding-top:12px}
+.adv summary{cursor:pointer;color:var(--muted);font-size:12.5px;margin-bottom:12px;user-select:none}
+.adv .row{display:flex;gap:10px}
+.adv .row>div{flex:1}
+.cerr{color:var(--red);font-size:12.5px;min-height:16px;margin-bottom:10px}
+.steps-list{background:var(--panel-2);border:1px solid var(--line-soft);border-radius:12px;padding:14px 16px 14px 30px;margin-top:16px;font-size:12.5px;color:#c2ccdb}
+.steps-list li{margin:5px 0;line-height:1.5}
+.steps-list a{color:var(--accent)}
+.note{font-size:11.5px;color:var(--muted-2);margin-top:12px;line-height:1.5}
+
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1a2230;border:1px solid var(--line);border-radius:12px;padding:12px 18px;font-size:13.5px;box-shadow:var(--shadow);z-index:60;opacity:0;transition:.35s cubic-bezier(.2,.9,.3,1.2);max-width:90vw}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.toast b{color:var(--green)}
+.confetti{position:fixed;z-index:70;width:9px;height:9px;pointer-events:none;border-radius:2px}
+
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes pop{from{opacity:0;transform:scale(.92) translateY(10px)}to{opacity:1;transform:none}}
+
+.foot{text-align:center;color:var(--muted-2);font-size:11.5px;margin-top:26px;font-family:var(--mono)}
+.legend{display:flex;gap:13px;flex-wrap:wrap;justify-content:center;margin-top:10px;font-size:11px;color:var(--muted)}
+.legend span{display:flex;align-items:center;gap:5px}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+
+  <div class="top">
+    <div class="brand">
+      <div class="logo"><b>T</b></div>
+      <div>
+        <h1>Tempo</h1>
+        <p>One thing at a time. Keep the pace.</p>
+      </div>
+    </div>
+    <div class="headright">
+      <div class="syncwrap">
+        <button class="pill" id="syncPill"><span class="led"></span><span id="syncTxt">&hellip;</span></button>
+        <div class="menu" id="syncMenu">
+          <button data-m="refresh">&#8635; Refresh now</button>
+          <div class="sep"></div>
+          <button data-m="disconnect" class="danger">&#9210; Disconnect this browser</button>
+        </div>
+      </div>
+      <div class="stats" id="stats"></div>
+    </div>
+  </div>
+
+  <div id="mainUI" class="hidden">
+    <div class="bar">
+      <form class="parkbox" id="parkForm">
+        <span class="ic">&#128161;</span>
+        <input id="parkInput" placeholder="Park an idea before it derails you&hellip; (Enter)" autocomplete="off">
+        <button class="btn sm" type="submit">Park it</button>
+      </form>
+      <button class="btn primary" id="pickBtn">&#127919; Pick one for me</button>
+      <button class="btn ghost" id="addBtn">+ Task</button>
+    </div>
+
+    <div class="tabs" id="tabs">
+      <button class="tab on" data-view="focus">Focus <span class="c" id="cFocus"></span></button>
+      <button class="tab" data-view="all">All <span class="c" id="cAll"></span></button>
+      <button class="tab" data-view="parked">Parked <span class="c" id="cParked"></span></button>
+    </div>
+
+    <div id="board"></div>
+
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="foot">Tempo &middot; synced to your private GitHub repo &middot; built around how your brain actually works</div>
+</div>
+
+<div class="overlay" id="overlay"><div class="focus" id="focusCard"></div></div>
+
+<!-- connect overlay -->
+<div class="overlay" id="connectOverlay">
+  <div class="connect">
+    <div class="kicker">&#128274; Connect your board</div>
+    <h2>Plug Tempo into your private repo</h2>
+    <p class="lede">Your tasks live in your private <b>tempo-data</b> repo. Paste a token once and this browser stays synced. Nothing sensitive is stored in the app or its public repo.</p>
+
+    <label>GitHub fine-grained token (gives this browser read/write to your board)</label>
+    <input id="tokenInput" type="password" placeholder="github_pat_&hellip;" autocomplete="off" spellcheck="false">
+
+    <details class="adv">
+      <summary>Advanced &mdash; change owner / repo / branch</summary>
+      <div class="row">
+        <div><label>Owner</label><input id="ownerInput" type="text" spellcheck="false"></div>
+        <div><label>Data repo</label><input id="repoInput" type="text" spellcheck="false"></div>
+      </div>
+      <label>Branch</label><input id="branchInput" type="text" spellcheck="false">
+    </details>
+
+    <div class="cerr" id="connectErr"></div>
+    <button class="btn primary" id="connectBtn" style="width:100%;justify-content:center">&#128279; Connect</button>
+
+    <ol class="steps-list">
+      <li>Create a <b>private</b> repo named <b>tempo-data</b>, and upload the <b>board.json</b> I gave you into it.</li>
+      <li>Make a fine-grained token here: <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a></li>
+      <li>Repository access &rarr; <b>Only select repositories</b> &rarr; pick <b>tempo-data</b>.</li>
+      <li>Permissions &rarr; Repository &rarr; <b>Contents</b> &rarr; <b>Read and write</b>. (That's the only one.)</li>
+      <li>Generate, copy the <b>github_pat_…</b> value, paste it above, hit Connect.</li>
+    </ol>
+    <p class="note">The token is scoped to only that one repo and is revocable in one click. It's stored solely in this browser and sent only to GitHub over HTTPS. On a shared/work machine, use <b>Disconnect</b> when you're done. &mdash; Heads up: this needs to run from your GitHub Pages URL; previewing inside a chat window won't reach GitHub, and that's expected.</p>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===================== config (non-secret) ===================== */
+function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
+function lsSet(k,v){try{localStorage.setItem(k,v);}catch(e){}}
+function lsDel(k){try{localStorage.removeItem(k);}catch(e){}}
+
+const TOKEN_KEY='tempo-gh-token';
+const GH={
+  owner: lsGet('tempo-gh-owner') || 'SowmyaCVBS',
+  repo:  lsGet('tempo-gh-repo')  || 'tempo-data',
+  path:  'board.json',
+  branch:lsGet('tempo-gh-branch')|| 'main'
+};
+
+let token=null, state=null, remoteSha=null, dirty=false, saving=false, pollTimer=null;
+
+/* ===================== status config ===================== */
+const STATUS={
+  progress:{label:'In Progress',short:'In progress'},
+  next:{label:'Next Priority',short:'Next priority'},
+  lagging:{label:'Personal Goals \u2014 Lagging',short:'Lagging'},
+  help:{label:'Help a teammate',short:'Help a teammate'},
+  team:{label:'Better for the team',short:'Better for the team'},
+  idea:{label:'Personal Goals \u2014 Ideas',short:'Idea'},
+  done:{label:'Done',short:'Done'}
+};
+const SECTION_ORDER=['progress','next','lagging','help','team','idea','done'];
+const FOCUS_STATUSES=['progress','next'];
+
+/* ===================== empty starter (NO real data) ===================== */
+function emptySeed(){
+  const now=Date.now();
+  return {
+    tasks:[{id:'welcome',title:'This is Tempo. Add your first task with + Task \u2014 or check this one off to watch the confetti. \ud83c\udf89',status:'next',est:5,parentId:null,url:null,pinned:true,firstStep:'Hit + Task up top and type literally anything. 2 min.',ref:false,createdAt:now,completedAt:null}],
+    parked:[], meta:{doneDate:todayKey(),doneToday:0}, ui:{collapsed:{done:true,idea:true},open:{}}
+  };
+}
+
+/* ===================== helpers ===================== */
+function todayKey(){const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
+function uid(){return 't'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);}
+function fmtMin(m){if(!m)return'';if(m<60)return m+'m';const h=Math.floor(m/60),r=m%60;return r?h+'h'+r:h+'h';}
+function kids(id){return state.tasks.filter(x=>x.parentId===id);}
+function actionable(x){return !x.ref && x.status!=='done';}
+function rollupEst(x){if(x.est)return x.est;const k=kids(x.id).filter(c=>!c.ref);if(!k.length)return null;const s=k.reduce((a,c)=>a+(rollupEst(c)||0),0);return s||null;}
+function subProgress(x){const k=kids(x.id).filter(c=>!c.ref);if(!k.length)return null;const done=k.filter(c=>c.status==='done').length;return{done,total:k.length,pct:Math.round(done/k.length*100)};}
+function checkDoneRollover(){if(state.meta.doneDate!==todayKey()){state.meta.doneDate=todayKey();state.meta.doneToday=0;}}
+function serialize(s){return{tasks:s.tasks,parked:s.parked,meta:s.meta,ui:s.ui};}
+function normalize(o){
+  o=o||{};
+  const s={tasks:Array.isArray(o.tasks)?o.tasks:[],parked:Array.isArray(o.parked)?o.parked:[],meta:o.meta||{doneDate:todayKey(),doneToday:0},ui:o.ui||{collapsed:{done:true,idea:true},open:{}}};
+  s.ui.collapsed=s.ui.collapsed||{done:true,idea:true};
+  s.ui.open=s.ui.open||{};
+  if(typeof s.meta.doneToday!=='number')s.meta.doneToday=0;
+  if(!s.meta.doneDate)s.meta.doneDate=todayKey();
+  s.tasks=s.tasks.map(t=>Object.assign({est:null,parentId:null,url:null,pinned:false,firstStep:null,ref:false,createdAt:Date.now(),completedAt:null,status:'team',title:'(untitled)'},t));
+  return s;
+}
+
+/* ===================== unicode-safe base64 ===================== */
+function b64encode(str){
+  const bytes=new TextEncoder().encode(str);let bin='';const chunk=0x8000;
+  for(let i=0;i<bytes.length;i+=chunk){bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+chunk));}
+  return btoa(bin);
+}
+function b64decode(b64){
+  const bin=atob((b64||'').replace(/\n/g,''));const bytes=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
+/* ===================== GitHub API ===================== */
+async function ghGet(){
+  const url='https://api.github.com/repos/'+GH.owner+'/'+GH.repo+'/contents/'+GH.path+'?ref='+encodeURIComponent(GH.branch)+'&t='+Date.now();
+  const r=await fetch(url,{headers:{'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json'},cache:'no-store'});
+  if(r.status===404)return{missing:true};
+  if(r.status===401||r.status===403)throw{auth:true,status:r.status};
+  if(!r.ok)throw{status:r.status};
+  const j=await r.json();
+  return{sha:j.sha,content:b64decode(j.content)};
+}
+async function ghPut(jsonStr,sha){
+  const url='https://api.github.com/repos/'+GH.owner+'/'+GH.repo+'/contents/'+GH.path;
+  const body={message:'tempo: update board '+new Date().toISOString(),content:b64encode(jsonStr),branch:GH.branch};
+  if(sha)body.sha=sha;
+  const r=await fetch(url,{method:'PUT',headers:{'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(r.status===401||r.status===403)throw{auth:true,status:r.status};
+  if(r.status===409||r.status===422)throw{conflict:true,status:r.status};
+  if(!r.ok)throw{status:r.status};
+  const j=await r.json();
+  return j.content.sha;
+}
+
+/* ===================== sync ===================== */
+function setSync(stt){
+  const pill=document.getElementById('syncPill'),txt=document.getElementById('syncTxt');
+  pill.classList.remove('ok','busy','bad');
+  const map={saved:['ok','Synced'],saving:['busy','Saving\u2026'],syncing:['busy','Syncing\u2026'],offline:['bad','Offline'],autherr:['bad','Reconnect'],idle:['','\u2026']};
+  const m=map[stt]||map.idle; if(m[0])pill.classList.add(m[0]); txt.textContent=m[1];
+}
+async function pull(){
+  if(!token)return false;
+  setSync('syncing');
+  try{
+    const res=await ghGet();
+    if(res.missing){state=emptySeed();remoteSha=null;await commit(true);return true;}
+    state=normalize(JSON.parse(res.content));remoteSha=res.sha;setSync('saved');return true;
+  }catch(e){setSync(e&&e.auth?'autherr':'offline');return false;}
+}
+let saveTimer=null;
+function scheduleSave(){dirty=true;setSync('saving');clearTimeout(saveTimer);saveTimer=setTimeout(commit,600);}
+async function commit(initial){
+  if(!token||saving)return;
+  saving=true;setSync('saving');
+  const payload=JSON.stringify(serialize(state),null,1);
+  try{
+    let newSha;
+    try{newSha=await ghPut(payload,remoteSha);}
+    catch(e){
+      if(e.conflict){const cur=await ghGet();remoteSha=cur.missing?null:cur.sha;newSha=await ghPut(payload,remoteSha);}
+      else throw e;
+    }
+    remoteSha=newSha;dirty=false;setSync('saved');
+  }catch(e){setSync(e&&e.auth?'autherr':'offline');}
+  finally{saving=false;}
+}
+function startPolling(){
+  clearInterval(pollTimer);
+  pollTimer=setInterval(async()=>{
+    if(document.hidden||!token||dirty||saving)return;
+    try{
+      const res=await ghGet();
+      if(res.missing)return;
+      if(res.sha!==remoteSha){
+        remoteSha=res.sha;state=normalize(JSON.parse(res.content));render();
+        toast('Pulled the latest from your other session. \ud83d\udd04');
+      }
+    }catch(e){}
+  },30000);
+}
+
+/* ===================== rendering ===================== */
+let view='focus';
+const board=document.getElementById('board');
+function render(){
+  if(!state)return;
+  checkDoneRollover();
+  renderStats();renderTabCounts();
+  if(view==='focus')renderFocusView();else if(view==='all')renderAllView();else renderParkedView();
+  scheduleSave();
+}
+function renderStats(){
+  const inprog=state.tasks.filter(x=>x.status==='progress'&&!x.ref).length;
+  document.getElementById('stats').innerHTML=
+    '<div class="stat"><div class="n" style="color:var(--green)">'+inprog+'</div><div class="l">In progress</div></div>'+
+    '<div class="stat"><div class="n" style="color:var(--yellow)">'+state.parked.length+'</div><div class="l">Parked</div></div>'+
+    '<div class="stat"><div class="n" style="color:var(--accent)">'+state.meta.doneToday+'</div><div class="l">Done today</div></div>';
+}
+function renderTabCounts(){
+  const f=state.tasks.filter(x=>FOCUS_STATUSES.includes(x.status)&&!x.ref).length;
+  document.getElementById('cFocus').textContent=f||'';
+  document.getElementById('cAll').textContent=state.tasks.filter(x=>actionable(x)).length;
+  document.getElementById('cParked').textContent=state.parked.length||'';
+}
+function taskHTML(x,isSub){
+  const kid=kids(x.id),prog=subProgress(x),est=rollupEst(x),isDone=x.status==='done',hasKids=kid.length>0,isOpen=state.ui.open[x.id];
+  let meta='';
+  if(prog)meta+='<span class="progwrap"><span class="ring" style="--p:'+prog.pct+'"></span><span class="subcount">'+prog.done+'/'+prog.total+' done</span></span>';
+  if(est&&!isDone)meta+='<span class="chip est" data-act="edit-est" data-id="'+x.id+'">&#9201; ~'+fmtMin(est)+'</span>';
+  if(x.url)meta+='<span class="chip"><a href="'+x.url+'" target="_blank" rel="noopener">&#128279; link</a></span>';
+  if(x.ref)meta+='<span class="ref-tag">REF</span>';
+  if(!x.ref&&!isDone)meta+='<select class="statussel" data-act="status" data-id="'+x.id+'">'+SECTION_ORDER.map(s=>'<option value="'+s+'" '+(x.status===s?'selected':'')+'>'+STATUS[s].short+'</option>').join('')+'</select>';
+  return '<div class="task '+(isSub?'sub':'')+' '+(isDone?'isdone':'')+' '+(x.pinned?'pinned':'')+' '+(isOpen?'open':'')+'" data-id="'+x.id+'">'+
+    (!x.ref?'<div class="check '+(isDone?'on':'')+'" data-act="check" data-id="'+x.id+'" title="Mark done"></div>':'<div style="width:19px;flex:none"></div>')+
+    '<div class="tmain"><div class="ttl">'+(x.pinned?'<span class="pin">&#128204; THE ONE</span>':'')+'<span class="dot '+x.status+'" style="width:9px;height:9px;vertical-align:middle;margin-right:7px"></span>'+escapeHtml(x.title)+'</div>'+
+    ((isOpen&&x.firstStep)?'<div class="firststep"><b>Start here &middot; on-ramp</b>'+escapeHtml(x.firstStep)+'</div>':'')+
+    '<div class="tmeta">'+(meta||'<span class="subcount">no estimate yet</span>')+'</div></div>'+
+    '<div class="expand"><span class="caret" data-act="toggle" data-id="'+x.id+'">'+(hasKids?'&#9660;':'&#43;')+'</span></div></div>'+
+    (isOpen?renderChildren(x.id):'');
+}
+function renderChildren(pid){
+  let html=kids(pid).map(c=>taskHTML(c,true)).join('');
+  html+='<div class="addrow"><input data-addsub="'+pid+'" placeholder="+ add a sub-task to break this down&hellip; (Enter)"></div>';
+  return '<div class="children">'+html+'</div>';
+}
+function renderFocusView(){
+  const items=state.tasks.filter(x=>FOCUS_STATUSES.includes(x.status)&&!x.ref&&x.parentId===null);
+  if(!items.length){
+    board.innerHTML='<div class="empty"><div class="big">Nothing\u2019s "in progress."</div><p>That\u2019s not a problem \u2014 it\u2019s a decision waiting to happen. Don\u2019t agonize. Let me pick, and start the clock.</p><button class="btn primary" id="pickEmpty">&#127919; Pick one for me</button></div>';
+    document.getElementById('pickEmpty').onclick=openPick;return;
+  }
+  board.innerHTML='<div class="section"><div class="slist">'+items.map(x=>taskHTML(x,false)).join('')+'</div></div><div class="empty" style="padding:20px"><p style="margin:0">That\u2019s it. That\u2019s the whole list right now. Everything else is one tab away \u2014 but it\u2019s not this minute\u2019s problem.</p></div>';
+}
+function renderAllView(){
+  let html='';
+  for(const s of SECTION_ORDER){
+    const tops=state.tasks.filter(x=>x.status===s&&x.parentId===null);if(!tops.length)continue;
+    const collapsed=state.ui.collapsed[s],totEst=tops.reduce((a,x)=>a+(rollupEst(x)||0),0);
+    html+='<div class="section '+(collapsed?'collapsed':'')+'" data-sec="'+s+'"><div class="shead" data-act="sec" data-sec="'+s+'"><span class="dot '+s+'"></span><h2>'+STATUS[s].label+'</h2><span class="cnt">'+tops.length+'</span>'+((totEst&&s!=='done')?'<span class="est">&#9201; ~'+fmtMin(totEst)+' total</span>':'<span class="est"></span>')+'<span class="car">&#9660;</span></div><div class="slist">'+tops.map(x=>taskHTML(x,false)).join('')+'</div></div>';
+  }
+  board.innerHTML=html||'<div class="empty"><div class="big">Clean slate.</div><p>Add a task or park an idea to get going.</p></div>';
+}
+function renderParkedView(){
+  if(!state.parked.length){board.innerHTML='<div class="empty"><div class="big">Nothing parked. &#128526;</div><p>This is your idea airlock. Next time a shiny thought hits mid-task, drop it in the box up top instead of chasing it.</p></div>';return;}
+  board.innerHTML='<div class="section"><div style="color:var(--muted);font-size:12.5px;margin-bottom:10px">Ideas you caught instead of chasing. Promote the good ones, dismiss the rest.</div>'+
+    state.parked.map(p=>'<div class="parked-card" data-pid="'+p.id+'"><span class="dot idea"></span><span class="pt">'+escapeHtml(p.text)+'</span><span class="when">'+timeAgo(p.createdAt)+'</span><button class="btn sm" data-act="promote" data-pid="'+p.id+'">&#8594; Make task</button><button class="btn sm ghost" data-act="dismiss" data-pid="'+p.id+'">&times;</button></div>').join('')+'</div>';
+}
+
+/* ===================== focus modal ===================== */
+let timerInt=null,timerStart=0,timerElapsed=0,timerTaskId=null,timerTarget=0;
+function pickTask(){
+  const pin=state.tasks.find(x=>x.pinned&&actionable(x));
+  if(pin&&kids(pin.id).filter(c=>!c.ref).length===0)return pin;
+  for(const s of ['progress','next','lagging','help','team','idea']){const c=state.tasks.find(x=>x.status===s&&actionable(x)&&kids(x.id).filter(k=>!k.ref).length===0);if(c)return c;}
+  if(pin){const c=kids(pin.id).find(k=>actionable(k));if(c)return c;}
+  return state.tasks.find(x=>actionable(x))||null;
+}
+function openPick(){const x=pickTask();if(!x){toast('Nothing left to pick. Either you\u2019re done, or everything\u2019s parked. Both fine. &#127881;');return;}openFocus(x.id);}
+function openFocus(id){
+  const x=state.tasks.find(t=>t.id===id);if(!x)return;
+  timerTaskId=id;timerElapsed=0;timerInt=null;timerTarget=(rollupEst(x)||25)*60;
+  const parent=x.parentId?state.tasks.find(t=>t.id===x.parentId):null;
+  const childSteps=kids(x.id).filter(c=>!c.ref);
+  let stepsHtml='';
+  if(x.firstStep)stepsHtml='<div class="step"><span class="dot progress" style="width:9px;height:9px"></span><div>'+escapeHtml(x.firstStep)+'</div></div>';
+  else if(childSteps.length)stepsHtml=childSteps.map(c=>'<div class="step"><div class="check '+(c.status==='done'?'on':'')+'" data-act="fcheck" data-id="'+c.id+'"></div><div>'+escapeHtml(c.title)+'</div></div>').join('');
+  else stepsHtml='<div class="step"><span class="dot next" style="width:9px;height:9px"></span><div>No sub-steps yet. First move: spend 2 minutes writing the very first concrete action \u2014 then do that.</div></div>';
+  document.getElementById('focusCard').innerHTML='<button class="xclose" data-act="closefocus">&times;</button><div class="kicker"><span class="dot '+x.status+'" style="width:9px;height:9px"></span>'+(parent?escapeHtml(parent.title)+' &rsaquo; ':'')+'your one thing</div><h2>'+escapeHtml(x.title)+'</h2><div class="ctx">Everything else can wait. The clock\u2019s the only thing watching \u2014 start it and beat the estimate.</div><div class="timer"><div class="clock" id="clock">00:00</div><div class="tgt">/ ~'+fmtMin(rollupEst(x)||25)+' target</div></div><div class="steps">'+stepsHtml+'</div><div class="fbtns"><button class="btn primary" data-act="timer">&#9654; Start clock</button><button class="btn" data-act="fdone">&#10003; Finished it</button><button class="btn ghost" data-act="fpark">Park &amp; pick another</button></div>';
+  document.getElementById('overlay').classList.add('on');updateClock();
+}
+function closeFocus(){document.getElementById('overlay').classList.remove('on');stopTimer();}
+function updateClock(){const el=document.getElementById('clock');if(!el)return;const tot=timerElapsed+(timerInt?Math.floor((Date.now()-timerStart)/1000):0);el.textContent=String(Math.floor(tot/60)).padStart(2,'0')+':'+String(tot%60).padStart(2,'0');el.classList.toggle('over',tot>timerTarget);}
+function toggleTimer(btn){if(timerInt){stopTimer();if(btn)btn.innerHTML='&#9654; Resume';}else{timerStart=Date.now();timerInt=setInterval(updateClock,500);if(btn)btn.innerHTML='&#10073;&#10073; Pause';}}
+function stopTimer(){if(timerInt){timerElapsed+=Math.floor((Date.now()-timerStart)/1000);clearInterval(timerInt);timerInt=null;}}
+
+/* ===================== mutations ===================== */
+function completeTask(id,silent){
+  const x=state.tasks.find(t=>t.id===id);if(!x)return;
+  const goingDone=x.status!=='done';
+  x.status=goingDone?'done':'progress';x.completedAt=goingDone?Date.now():null;
+  if(goingDone){kids(id).forEach(c=>{if(c.status!=='done'&&!c.ref){c.status='done';c.completedAt=Date.now();}});state.meta.doneToday++;if(!silent){confetti();toast(pickFinishLine());}}
+}
+const FINISH_LINES=['Finished. <b>Actually</b> finished. Look at you. &#127881;','Closed it out \u2014 the part most people skip. &#128170;','Done and dusted. Momentum\u2019s yours, ride it.','One fewer open loop in your head. Feels good, right?','That\u2019s a finish, not a \u201cmoved-on.\u201d Big difference. &#9889;'];
+function pickFinishLine(){return FINISH_LINES[Math.floor(Math.random()*FINISH_LINES.length)];}
+function setStatus(id,s){const x=state.tasks.find(t=>t.id===id);if(x){x.status=s;if(s==='done'){x.completedAt=Date.now();state.meta.doneToday++;confetti();}}}
+function editEst(id){const x=state.tasks.find(t=>t.id===id);if(!x)return;const v=prompt('Estimate in minutes for:\n\n'+x.title+'\n\n(numbers only \u2014 small first steps beat scary big ones)',x.est||'');if(v===null)return;const n=parseInt(v,10);x.est=isNaN(n)?null:n;render();}
+function parkIdea(text){if(!text.trim())return;state.parked.unshift({id:uid(),text:text.trim(),createdAt:Date.now()});toast('Parked. It\u2019s safe. <b>Eyes back on the prize.</b> &#128064;');}
+function promoteParked(pid){const i=state.parked.findIndex(p=>p.id===pid);if(i<0)return;const p=state.parked.splice(i,1)[0];state.tasks.push({id:uid(),title:p.text,status:'idea',est:null,parentId:null,url:null,pinned:false,firstStep:null,ref:false,createdAt:Date.now(),completedAt:null});toast('Promoted to an Idea \u2014 it\u2019s on the board now.');view='all';syncTabs();}
+function addTask(){const title=prompt('New task \u2014 what is it?');if(!title||!title.trim())return;const est=prompt('Rough estimate in minutes? (leave blank if unsure)','');const n=parseInt(est,10);state.tasks.push({id:uid(),title:title.trim(),status:'next',est:isNaN(n)?null:n,parentId:null,url:null,pinned:false,firstStep:null,ref:false,createdAt:Date.now(),completedAt:null});toast('Added to <b>Next Priority</b>. Set its status whenever.');}
+function addSub(pid,title){if(!title.trim())return;const parent=state.tasks.find(t=>t.id===pid);state.tasks.push({id:uid(),title:title.trim(),status:parent?parent.status:'team',est:null,parentId:pid,url:null,pinned:false,firstStep:null,ref:false,createdAt:Date.now(),completedAt:null});state.ui.open[pid]=true;}
+
+/* ===================== events ===================== */
+board.addEventListener('click',e=>{
+  const el=e.target.closest('[data-act]');if(!el)return;
+  const act=el.dataset.act,id=el.dataset.id,pid=el.dataset.pid,sec=el.dataset.sec;
+  if(act==='check'){completeTask(id);render();}
+  else if(act==='toggle'){state.ui.open[id]=!state.ui.open[id];render();}
+  else if(act==='edit-est'){editEst(id);}
+  else if(act==='sec'){state.ui.collapsed[sec]=!state.ui.collapsed[sec];render();}
+  else if(act==='promote'){promoteParked(pid);render();}
+  else if(act==='dismiss'){state.parked=state.parked.filter(p=>p.id!==pid);toast('Dismissed. Good call \u2014 not every idea earns a slot.');render();}
+});
+board.addEventListener('change',e=>{const el=e.target.closest('[data-act="status"]');if(el){setStatus(el.dataset.id,el.value);render();}});
+board.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.dataset.addsub){e.preventDefault();addSub(e.target.dataset.addsub,e.target.value);render();}});
+document.getElementById('focusCard').addEventListener('click',e=>{
+  const el=e.target.closest('[data-act]');if(!el)return;const act=el.dataset.act;
+  if(act==='closefocus')closeFocus();else if(act==='timer')toggleTimer(el);
+  else if(act==='fdone'){completeTask(timerTaskId);closeFocus();render();}
+  else if(act==='fpark'){closeFocus();openPick();}
+  else if(act==='fcheck'){completeTask(el.dataset.id,true);render();openFocus(timerTaskId);}
+});
+document.getElementById('overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeFocus();});
+document.getElementById('parkForm').addEventListener('submit',e=>{e.preventDefault();const inp=document.getElementById('parkInput');parkIdea(inp.value);inp.value='';render();});
+document.getElementById('pickBtn').onclick=openPick;
+document.getElementById('addBtn').onclick=()=>{addTask();render();};
+document.getElementById('tabs').addEventListener('click',e=>{const t=e.target.closest('.tab');if(!t)return;view=t.dataset.view;syncTabs();render();});
+function syncTabs(){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.view===view));}
+
+/* sync menu */
+document.getElementById('syncPill').addEventListener('click',()=>{document.getElementById('syncMenu').classList.toggle('on');});
+document.getElementById('syncMenu').addEventListener('click',async e=>{
+  const b=e.target.closest('[data-m]');if(!b)return;
+  document.getElementById('syncMenu').classList.remove('on');
+  if(b.dataset.m==='refresh'){const ok=await pull();if(ok)render();}
+  else if(b.dataset.m==='disconnect')disconnect();
+});
+document.addEventListener('click',e=>{if(!e.target.closest('.syncwrap'))document.getElementById('syncMenu').classList.remove('on');});
+
+/* connect */
+function showConnect(){
+  document.getElementById('connectOverlay').classList.add('on');
+  document.getElementById('mainUI').classList.add('hidden');
+  document.getElementById('ownerInput').value=GH.owner;
+  document.getElementById('repoInput').value=GH.repo;
+  document.getElementById('branchInput').value=GH.branch;
+  setSync('idle');
+}
+function hideConnect(){document.getElementById('connectOverlay').classList.remove('on');document.getElementById('mainUI').classList.remove('hidden');}
+async function doConnect(){
+  const v=document.getElementById('tokenInput').value.trim();
+  const err=document.getElementById('connectErr');
+  if(!v){err.textContent='Paste your token first.';return;}
+  GH.owner=(document.getElementById('ownerInput').value.trim()||'SowmyaCVBS');
+  GH.repo=(document.getElementById('repoInput').value.trim()||'tempo-data');
+  GH.branch=(document.getElementById('branchInput').value.trim()||'main');
+  lsSet('tempo-gh-owner',GH.owner);lsSet('tempo-gh-repo',GH.repo);lsSet('tempo-gh-branch',GH.branch);
+  token=v;err.textContent='';setSync('syncing');
+  const btn=document.getElementById('connectBtn');btn.disabled=true;
+  const ok=await pull();
+  btn.disabled=false;
+  if(ok){lsSet(TOKEN_KEY,v);hideConnect();render();startPolling();toast('Connected. Your board is live. &#128279;');}
+  else{token=null;err.textContent='Couldn\u2019t connect. Check: repo exists, token has Contents read/write on '+GH.owner+'/'+GH.repo+', and board.json was uploaded.';}
+}
+function disconnect(){lsDel(TOKEN_KEY);token=null;remoteSha=null;state=null;clearInterval(pollTimer);document.getElementById('tokenInput').value='';showConnect();toast('Disconnected. Token wiped from this browser.');}
+document.getElementById('connectBtn').addEventListener('click',doConnect);
+document.getElementById('tokenInput').addEventListener('keydown',e=>{if(e.key==='Enter')doConnect();});
+
+/* ===================== fx ===================== */
+function toast(html){const el=document.getElementById('toast');el.innerHTML=html;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2800);}
+function confetti(){const colors=['#2bd07a','#f5933b','#eab308','#6ea8ff','#f15b5b'];for(let i=0;i<26;i++){const c=document.createElement('div');c.className='confetti';c.style.left=(40+Math.random()*20)+'vw';c.style.top='38vh';c.style.background=colors[i%colors.length];const dx=(Math.random()-.5)*420;c.animate([{transform:'translate(0,0) rotate(0)',opacity:1},{transform:'translate('+dx+'px,'+(300+Math.random()*240)+'px) rotate('+(720*Math.random())+'deg)',opacity:0}],{duration:1100+Math.random()*700,easing:'cubic-bezier(.2,.6,.4,1)'});document.body.appendChild(c);setTimeout(()=>c.remove(),1900);}}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+function timeAgo(ts){const d=(Date.now()-ts)/1000;if(d<60)return'just now';if(d<3600)return Math.floor(d/60)+'m ago';if(d<86400)return Math.floor(d/3600)+'h ago';return Math.floor(d/86400)+'d ago';}
+
+/* ===================== legend ===================== */
+document.getElementById('legend').innerHTML=SECTION_ORDER.map(s=>'<span><span class="dot '+s+'" style="width:10px;height:10px"></span>'+STATUS[s].short+'</span>').join('');
+
+/* ===================== boot ===================== */
+(async function(){
+  token=lsGet(TOKEN_KEY);
+  if(!token){showConnect();return;}
+  const ok=await pull();
+  if(ok){hideConnect();render();startPolling();}
+  else{showConnect();document.getElementById('connectErr').textContent='Saved token didn\u2019t work \u2014 it may have expired. Paste a fresh one.';}
+})();
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&token&&!dirty&&!saving){pull().then(ok=>{if(ok)render();});}});
+</script>
+</body>
+</html>
