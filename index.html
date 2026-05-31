@@ -100,6 +100,8 @@ body{
 .task{background:var(--panel);border:1px solid var(--line-soft);border-radius:12px;padding:11px 13px;display:flex;align-items:flex-start;gap:11px;transition:.15s;position:relative}
 .task:hover{border-color:#2c3848}
 .task.sub{margin-left:26px;background:var(--panel-2)}
+.task.sub.dim{opacity:.5}
+.task.sub.dim:hover,.task.sub.dim:focus-within{opacity:1}
 .task.isdone .ttl{color:var(--muted-2);text-decoration:line-through}
 .task.pinned{border-color:#3a557e;box-shadow:inset 2px 0 0 var(--accent)}
 .check{width:19px;height:19px;border-radius:6px;border:1.8px solid #3a4556;flex:none;margin-top:1px;cursor:pointer;transition:.15s;display:grid;place-items:center;background:none}
@@ -451,7 +453,7 @@ function taskHTML(x,isSub){
   if(x.url)meta+='<span class="chip"><a href="'+x.url+'" target="_blank" rel="noopener">&#128279; link</a></span>';
   if(x.ref)meta+='<span class="ref-tag">REF</span>';
   if(!x.ref&&!isDone)meta+='<select class="statussel" data-act="status" data-id="'+x.id+'">'+SECTION_ORDER.map(s=>'<option value="'+s+'" '+(x.status===s?'selected':'')+'>'+STATUS[s].short+'</option>').join('')+'</select>';
-  return '<div class="task '+(isSub?'sub':'')+' '+(isDone?'isdone':'')+' '+(x.pinned?'pinned':'')+' '+(isOpen?'open':'')+'" data-id="'+x.id+'">'+
+  return '<div class="task '+(isSub?'sub':'')+' '+(isSub&&x.status!=='progress'?'dim':'')+' '+(isDone?'isdone':'')+' '+(x.pinned?'pinned':'')+' '+(isOpen?'open':'')+'" data-id="'+x.id+'">'+
     (!x.ref?'<div class="check '+(isDone?'on':'')+'" data-act="check" data-id="'+x.id+'" title="Mark done"></div>':'<div style="width:19px;flex:none"></div>')+
     '<div class="tmain"><div class="ttl">'+(x.pinned?'<span class="pin">&#128204; THE ONE</span>':'')+'<span class="dot '+x.status+'" style="width:9px;height:9px;vertical-align:middle;margin-right:7px"></span>'+escapeHtml(x.title)+'</div>'+
     ((isOpen&&x.firstStep)?'<div class="firststep"><b>Start here &middot; on-ramp</b>'+escapeHtml(x.firstStep)+'</div>':'')+
