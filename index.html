@@ -115,6 +115,8 @@ body{
 .chip{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--panel-2);border:1px solid var(--line-soft);padding:2px 8px;border-radius:7px;cursor:pointer;transition:.12s}
 .chip:hover{border-color:#3a4556;color:var(--txt)}
 .chip.est{color:#cdd5e3}
+.chip.mv{padding:2px 7px;color:var(--muted-2)}
+.chip.mv:hover{color:var(--accent);border-color:#3a4556}
 .chip a{color:var(--accent);text-decoration:none}
 .ref-tag{font-family:var(--mono);font-size:10px;color:var(--muted-2);border:1px solid var(--line-soft);padding:1px 6px;border-radius:6px}
 select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2);color:var(--muted);border:1px solid var(--line-soft);border-radius:7px;padding:2px 6px;cursor:pointer;outline:none}
@@ -401,7 +403,7 @@ async function commit(initial){
 function startPolling(){
   clearInterval(pollTimer);
   pollTimer=setInterval(async()=>{
-    if(document.hidden||!token||dirty||saving)return;
+    if(document.hidden||!token||dirty||saving||userIsTyping())return;
     try{
       const res=await ghGet();
       if(res.missing)return;
@@ -456,6 +458,7 @@ function taskHTML(x,isSub){
   if(x.url)meta+='<span class="chip"><a href="'+x.url+'" target="_blank" rel="noopener">&#128279; link</a></span>';
   if(x.ref)meta+='<span class="ref-tag">REF</span>';
   if(!x.ref&&!isDone)meta+='<select class="statussel" data-act="status" data-id="'+x.id+'">'+SECTION_ORDER.map(s=>'<option value="'+s+'" '+(x.status===s?'selected':'')+'>'+STATUS[s].short+'</option>').join('')+'</select>';
+  if(isSub&&!FOCUSMODE)meta+='<span class="chip mv" data-act="up" data-id="'+x.id+'" title="Move up">&#9650;</span><span class="chip mv" data-act="down" data-id="'+x.id+'" title="Move down">&#9660;</span>';
   return '<div class="task '+(isSub?'sub':'')+' '+(dimmed?'dim':'')+' '+(isDone?'isdone':'')+' '+(x.pinned?'pinned':'')+' '+(isOpen?'open':'')+'" data-id="'+x.id+'">'+
     (!x.ref?'<div class="check '+(isDone?'on':'')+'" data-act="check" data-id="'+x.id+'" title="Mark done"></div>':'<div style="width:19px;flex:none"></div>')+
     '<div class="tmain"><div class="ttl">'+(x.pinned?'<span class="pin">&#128204; THE ONE</span>':'')+'<span class="dot '+x.status+'" style="width:9px;height:9px;vertical-align:middle;margin-right:7px"></span>'+escapeHtml(x.title)+'</div>'+
@@ -550,6 +553,8 @@ board.addEventListener('click',e=>{
   else if(act==='sec'){state.ui.collapsed[sec]=!state.ui.collapsed[sec];render();}
   else if(act==='promote'){promoteParked(pid);render();}
   else if(act==='dismiss'){state.parked=state.parked.filter(p=>p.id!==pid);toast('Dismissed. Good call \u2014 not every idea earns a slot.');render();}
+  else if(act==='up'){moveTask(id,-1);render();}
+  else if(act==='down'){moveTask(id,1);render();}
 });
 board.addEventListener('change',e=>{const el=e.target.closest('[data-act="status"]');if(el){setStatus(el.dataset.id,el.value);render();}});
 board.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.dataset.addsub){e.preventDefault();addSub(e.target.dataset.addsub,e.target.value);render();}});
@@ -610,6 +615,15 @@ document.getElementById('tokenInput').addEventListener('keydown',e=>{if(e.key===
 function toast(html){const el=document.getElementById('toast');el.innerHTML=html;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2800);}
 function confetti(){const colors=['#2bd07a','#f5933b','#eab308','#6ea8ff','#f15b5b'];for(let i=0;i<26;i++){const c=document.createElement('div');c.className='confetti';c.style.left=(40+Math.random()*20)+'vw';c.style.top='38vh';c.style.background=colors[i%colors.length];const dx=(Math.random()-.5)*420;c.animate([{transform:'translate(0,0) rotate(0)',opacity:1},{transform:'translate('+dx+'px,'+(300+Math.random()*240)+'px) rotate('+(720*Math.random())+'deg)',opacity:0}],{duration:1100+Math.random()*700,easing:'cubic-bezier(.2,.6,.4,1)'});document.body.appendChild(c);setTimeout(()=>c.remove(),1900);}}
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+function userIsTyping(){const a=document.activeElement;return !!(a&&a.matches&&a.matches('input,textarea'));}
+function moveTask(id,dir){
+  const me=state.tasks.find(t=>t.id===id);if(!me)return;
+  const sibs=state.tasks.filter(t=>t.parentId===me.parentId);
+  const pos=sibs.indexOf(me),swapWith=sibs[pos+dir];
+  if(!swapWith)return;
+  const i=state.tasks.indexOf(me),j=state.tasks.indexOf(swapWith);
+  state.tasks[i]=swapWith;state.tasks[j]=me;
+}
 function timeAgo(ts){const d=(Date.now()-ts)/1000;if(d<60)return'just now';if(d<3600)return Math.floor(d/60)+'m ago';if(d<86400)return Math.floor(d/3600)+'h ago';return Math.floor(d/86400)+'d ago';}
 
 /* ===================== legend ===================== */
@@ -623,7 +637,7 @@ document.getElementById('legend').innerHTML=SECTION_ORDER.map(s=>'<span><span cl
   if(ok){hideConnect();render();startPolling();}
   else{showConnect();document.getElementById('connectErr').textContent='Saved token didn\u2019t work \u2014 it may have expired. Paste a fresh one.';}
 })();
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&token&&!dirty&&!saving){pull().then(ok=>{if(ok)render();});}});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&token&&!dirty&&!saving&&!userIsTyping()){pull().then(ok=>{if(ok)render();});}});
 </script>
 </body>
 </html>
