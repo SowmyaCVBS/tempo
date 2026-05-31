@@ -299,7 +299,7 @@ const STATUS={
   done:{label:'Done',short:'Done'}
 };
 const SECTION_ORDER=['progress','next','lagging','help','team','idea','done'];
-const FOCUS_STATUSES=['progress','next'];
+const FOCUS_STATUSES=['progress'];
 
 /* ===================== empty starter (NO real data) ===================== */
 function emptySeed(){
@@ -415,6 +415,7 @@ function startPolling(){
 
 /* ===================== rendering ===================== */
 let view='focus';
+let FOCUSMODE=false;
 const board=document.getElementById('board');
 function render(){
   if(!state)return;
@@ -431,13 +432,15 @@ function renderStats(){
     '<div class="stat"><div class="n" style="color:var(--accent)">'+state.meta.doneToday+'</div><div class="l">Done today</div></div>';
 }
 function renderTabCounts(){
-  const f=state.tasks.filter(x=>FOCUS_STATUSES.includes(x.status)&&!x.ref).length;
-  document.getElementById('cFocus').textContent=f||'';
+  document.getElementById('cFocus').textContent=focusTops().length||'';
   document.getElementById('cAll').textContent=state.tasks.filter(x=>actionable(x)).length;
   document.getElementById('cParked').textContent=state.parked.length||'';
 }
 function taskHTML(x,isSub){
-  const kid=kids(x.id),prog=subProgress(x),est=rollupEst(x),isDone=x.status==='done',hasKids=kid.length>0,isOpen=state.ui.open[x.id];
+  const kid=kids(x.id),prog=subProgress(x),est=rollupEst(x),isDone=x.status==='done',hasKids=kid.length>0;
+  const onFocusChain=(x.status==='progress')||hasProgressDescendant(x);
+  const isOpen=state.ui.open[x.id]||(FOCUSMODE&&onFocusChain);
+  const dimmed=isSub&&x.status!=='progress'&&!hasProgressDescendant(x);
   let meta='';
   if(prog)meta+='<span class="progwrap"><span class="ring" style="--p:'+prog.pct+'"></span><span class="subcount">'+prog.done+'/'+prog.total+' done</span></span>';
   if(!isDone){
@@ -453,7 +456,7 @@ function taskHTML(x,isSub){
   if(x.url)meta+='<span class="chip"><a href="'+x.url+'" target="_blank" rel="noopener">&#128279; link</a></span>';
   if(x.ref)meta+='<span class="ref-tag">REF</span>';
   if(!x.ref&&!isDone)meta+='<select class="statussel" data-act="status" data-id="'+x.id+'">'+SECTION_ORDER.map(s=>'<option value="'+s+'" '+(x.status===s?'selected':'')+'>'+STATUS[s].short+'</option>').join('')+'</select>';
-  return '<div class="task '+(isSub?'sub':'')+' '+(isSub&&x.status!=='progress'?'dim':'')+' '+(isDone?'isdone':'')+' '+(x.pinned?'pinned':'')+' '+(isOpen?'open':'')+'" data-id="'+x.id+'">'+
+  return '<div class="task '+(isSub?'sub':'')+' '+(dimmed?'dim':'')+' '+(isDone?'isdone':'')+' '+(x.pinned?'pinned':'')+' '+(isOpen?'open':'')+'" data-id="'+x.id+'">'+
     (!x.ref?'<div class="check '+(isDone?'on':'')+'" data-act="check" data-id="'+x.id+'" title="Mark done"></div>':'<div style="width:19px;flex:none"></div>')+
     '<div class="tmain"><div class="ttl">'+(x.pinned?'<span class="pin">&#128204; THE ONE</span>':'')+'<span class="dot '+x.status+'" style="width:9px;height:9px;vertical-align:middle;margin-right:7px"></span>'+escapeHtml(x.title)+'</div>'+
     ((isOpen&&x.firstStep)?'<div class="firststep"><b>Start here &middot; on-ramp</b>'+escapeHtml(x.firstStep)+'</div>':'')+
@@ -466,13 +469,18 @@ function renderChildren(pid){
   html+='<div class="addrow"><input data-addsub="'+pid+'" placeholder="+ add a sub-task to break this down&hellip; (Enter)"></div>';
   return '<div class="children">'+html+'</div>';
 }
+function hasProgressDescendant(x){return kids(x.id).some(c=>!c.ref&&(c.status==='progress'||hasProgressDescendant(c)));}
+function focusTops(){return state.tasks.filter(x=>!x.ref&&x.parentId===null&&(x.status==='progress'||hasProgressDescendant(x)));}
 function renderFocusView(){
-  const items=state.tasks.filter(x=>FOCUS_STATUSES.includes(x.status)&&!x.ref&&x.parentId===null);
+  const items=focusTops();
   if(!items.length){
     board.innerHTML='<div class="empty"><div class="big">Nothing\u2019s "in progress."</div><p>That\u2019s not a problem \u2014 it\u2019s a decision waiting to happen. Don\u2019t agonize. Let me pick, and start the clock.</p><button class="btn primary" id="pickEmpty">&#127919; Pick one for me</button></div>';
     document.getElementById('pickEmpty').onclick=openPick;return;
   }
-  board.innerHTML='<div class="section"><div class="slist">'+items.map(x=>taskHTML(x,false)).join('')+'</div></div><div class="empty" style="padding:20px"><p style="margin:0">That\u2019s it. That\u2019s the whole list right now. Everything else is one tab away \u2014 but it\u2019s not this minute\u2019s problem.</p></div>';
+  FOCUSMODE=true;
+  const body=items.map(x=>taskHTML(x,false)).join('');
+  FOCUSMODE=false;
+  board.innerHTML='<div class="section"><div class="slist">'+body+'</div></div><div class="empty" style="padding:20px"><p style="margin:0">That\u2019s it. That\u2019s the whole list right now. Everything else is one tab away \u2014 but it\u2019s not this minute\u2019s problem.</p></div>';
 }
 function renderAllView(){
   let html='';
@@ -498,7 +506,7 @@ function pickTask(){
   if(pin){const c=kids(pin.id).find(k=>actionable(k));if(c)return c;}
   return state.tasks.find(x=>actionable(x))||null;
 }
-function openPick(){const x=pickTask();if(!x){toast('Nothing left to pick. Either you\u2019re done, or everything\u2019s parked. Both fine. &#127881;');return;}openFocus(x.id);}
+function openPick(){const x=pickTask();if(!x){toast('Nothing left to pick. Either you\u2019re done, or everything\u2019s parked. Both fine. &#127881;');return;}if(x.status!=='done'){x.status='progress';render();}openFocus(x.id);}
 function openFocus(id){
   const x=state.tasks.find(t=>t.id===id);if(!x)return;
   timerTaskId=id;timerElapsed=0;timerInt=null;timerTarget=(rollupEst(x)||25)*60;
@@ -511,7 +519,7 @@ function openFocus(id){
   document.getElementById('focusCard').innerHTML='<button class="xclose" data-act="closefocus">&times;</button><div class="kicker"><span class="dot '+x.status+'" style="width:9px;height:9px"></span>'+(parent?escapeHtml(parent.title)+' &rsaquo; ':'')+'your one thing</div><h2>'+escapeHtml(x.title)+'</h2><div class="ctx">Everything else can wait. The clock\u2019s the only thing watching \u2014 start it and beat the estimate.</div><div class="timer"><div class="clock" id="clock">00:00</div><div class="tgt">/ ~'+fmtMin(rollupEst(x)||25)+' target</div></div><div class="steps">'+stepsHtml+'</div><div class="fbtns"><button class="btn primary" data-act="timer">&#9654; Start clock</button><button class="btn" data-act="fdone">&#10003; Finished it</button><button class="btn ghost" data-act="fpark">Park &amp; pick another</button></div>';
   document.getElementById('overlay').classList.add('on');updateClock();
 }
-function closeFocus(){document.getElementById('overlay').classList.remove('on');stopTimer();}
+function closeFocus(){document.getElementById('overlay').classList.remove('on');stopTimer();render();}
 function updateClock(){const el=document.getElementById('clock');if(!el)return;const tot=timerElapsed+(timerInt?Math.floor((Date.now()-timerStart)/1000):0);el.textContent=String(Math.floor(tot/60)).padStart(2,'0')+':'+String(tot%60).padStart(2,'0');el.classList.toggle('over',tot>timerTarget);}
 function toggleTimer(btn){if(timerInt){stopTimer();if(btn)btn.innerHTML='&#9654; Resume';}else{timerStart=Date.now();timerInt=setInterval(updateClock,500);if(btn)btn.innerHTML='&#10073;&#10073; Pause';}}
 function stopTimer(){if(timerInt){timerElapsed+=Math.floor((Date.now()-timerStart)/1000);clearInterval(timerInt);timerInt=null;}}
@@ -549,7 +557,7 @@ document.getElementById('focusCard').addEventListener('click',e=>{
   const el=e.target.closest('[data-act]');if(!el)return;const act=el.dataset.act;
   if(act==='closefocus')closeFocus();else if(act==='timer')toggleTimer(el);
   else if(act==='fdone'){completeTask(timerTaskId);closeFocus();render();}
-  else if(act==='fpark'){closeFocus();openPick();}
+  else if(act==='fpark'){const cur=state.tasks.find(t=>t.id===timerTaskId);if(cur&&cur.status==='progress')cur.status='next';closeFocus();openPick();}
   else if(act==='fcheck'){completeTask(el.dataset.id,true);render();openFocus(timerTaskId);}
 });
 document.getElementById('overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeFocus();});
