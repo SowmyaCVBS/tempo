@@ -314,7 +314,7 @@ function uid(){return 't'+Date.now().toString(36)+Math.random().toString(36).sli
 function fmtMin(m){if(!m)return'';if(m<60)return m+'m';const h=Math.floor(m/60),r=m%60;return r?h+'h'+r:h+'h';}
 function kids(id){return state.tasks.filter(x=>x.parentId===id);}
 function actionable(x){return !x.ref && x.status!=='done';}
-function rollupEst(x){if(x.est)return x.est;const k=kids(x.id).filter(c=>!c.ref);if(!k.length)return null;const s=k.reduce((a,c)=>a+(rollupEst(c)||0),0);return s||null;}
+function rollupEst(x){const k=kids(x.id).filter(c=>!c.ref);if(k.length){const s=k.reduce((a,c)=>a+(rollupEst(c)||0),0);return s||null;}return x.est||null;}
 function subProgress(x){const k=kids(x.id).filter(c=>!c.ref);if(!k.length)return null;const done=k.filter(c=>c.status==='done').length;return{done,total:k.length,pct:Math.round(done/k.length*100)};}
 function checkDoneRollover(){if(state.meta.doneDate!==todayKey()){state.meta.doneDate=todayKey();state.meta.doneToday=0;}}
 function serialize(s){return{tasks:s.tasks,parked:s.parked,meta:s.meta,ui:s.ui};}
@@ -438,7 +438,16 @@ function taskHTML(x,isSub){
   const kid=kids(x.id),prog=subProgress(x),est=rollupEst(x),isDone=x.status==='done',hasKids=kid.length>0,isOpen=state.ui.open[x.id];
   let meta='';
   if(prog)meta+='<span class="progwrap"><span class="ring" style="--p:'+prog.pct+'"></span><span class="subcount">'+prog.done+'/'+prog.total+' done</span></span>';
-  if(est&&!isDone)meta+='<span class="chip est" data-act="edit-est" data-id="'+x.id+'">&#9201; ~'+fmtMin(est)+'</span>';
+  if(!isDone){
+    const hasRealKids=kid.filter(c=>!c.ref).length>0;
+    if(hasRealKids){
+      if(est)meta+='<span class="chip est" style="cursor:default" title="auto-summed from sub-tasks">&#9201; ~'+fmtMin(est)+' total</span>';
+      else meta+='<span class="chip" style="cursor:default;border-style:dashed">&#9201; estimate the sub-tasks &#8595;</span>';
+    }else{
+      if(est)meta+='<span class="chip est" data-act="edit-est" data-id="'+x.id+'">&#9201; ~'+fmtMin(est)+'</span>';
+      else meta+='<span class="chip" data-act="edit-est" data-id="'+x.id+'" style="border-style:dashed;color:var(--accent)">&#9201; + add estimate</span>';
+    }
+  }
   if(x.url)meta+='<span class="chip"><a href="'+x.url+'" target="_blank" rel="noopener">&#128279; link</a></span>';
   if(x.ref)meta+='<span class="ref-tag">REF</span>';
   if(!x.ref&&!isDone)meta+='<select class="statussel" data-act="status" data-id="'+x.id+'">'+SECTION_ORDER.map(s=>'<option value="'+s+'" '+(x.status===s?'selected':'')+'>'+STATUS[s].short+'</option>').join('')+'</select>';
@@ -446,7 +455,7 @@ function taskHTML(x,isSub){
     (!x.ref?'<div class="check '+(isDone?'on':'')+'" data-act="check" data-id="'+x.id+'" title="Mark done"></div>':'<div style="width:19px;flex:none"></div>')+
     '<div class="tmain"><div class="ttl">'+(x.pinned?'<span class="pin">&#128204; THE ONE</span>':'')+'<span class="dot '+x.status+'" style="width:9px;height:9px;vertical-align:middle;margin-right:7px"></span>'+escapeHtml(x.title)+'</div>'+
     ((isOpen&&x.firstStep)?'<div class="firststep"><b>Start here &middot; on-ramp</b>'+escapeHtml(x.firstStep)+'</div>':'')+
-    '<div class="tmeta">'+(meta||'<span class="subcount">no estimate yet</span>')+'</div></div>'+
+    '<div class="tmeta">'+meta+'</div></div>'+
     '<div class="expand"><span class="caret" data-act="toggle" data-id="'+x.id+'">'+(hasKids?'&#9660;':'&#43;')+'</span></div></div>'+
     (isOpen?renderChildren(x.id):'');
 }
