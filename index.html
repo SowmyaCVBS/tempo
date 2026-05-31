@@ -117,6 +117,8 @@ body{
 .chip.est{color:#cdd5e3}
 .chip.mv{padding:2px 7px;color:var(--muted-2)}
 .chip.mv:hover{color:var(--accent);border-color:#3a4556}
+.chip.del{color:var(--muted-2)}
+.chip.del:hover{color:var(--red);border-color:var(--red)}
 .chip a{color:var(--accent);text-decoration:none}
 .ref-tag{font-family:var(--mono);font-size:10px;color:var(--muted-2);border:1px solid var(--line-soft);padding:1px 6px;border-radius:6px}
 select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2);color:var(--muted);border:1px solid var(--line-soft);border-radius:7px;padding:2px 6px;cursor:pointer;outline:none}
@@ -234,7 +236,7 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
     <div class="legend" id="legend"></div>
   </div>
 
-  <div class="foot">Tempo &middot; synced to your private GitHub repo &middot; built around how your brain actually works</div>
+  <div class="foot">Tempo &middot; synced to your private GitHub repo &middot; <b style="color:var(--accent)">build v4</b></div>
 </div>
 
 <div class="overlay" id="overlay"><div class="focus" id="focusCard"></div></div>
@@ -441,7 +443,7 @@ function renderTabCounts(){
 function taskHTML(x,isSub){
   const kid=kids(x.id),prog=subProgress(x),est=rollupEst(x),isDone=x.status==='done',hasKids=kid.length>0;
   const onFocusChain=(x.status==='progress')||hasProgressDescendant(x);
-  const isOpen=state.ui.open[x.id]||(FOCUSMODE&&onFocusChain);
+  const isOpen=state.ui.open[x.id]||(FOCUSMODE&&hasProgressDescendant(x));
   const dimmed=isSub&&x.status!=='progress'&&!hasProgressDescendant(x);
   let meta='';
   if(prog)meta+='<span class="progwrap"><span class="ring" style="--p:'+prog.pct+'"></span><span class="subcount">'+prog.done+'/'+prog.total+' done</span></span>';
@@ -458,7 +460,8 @@ function taskHTML(x,isSub){
   if(x.url)meta+='<span class="chip"><a href="'+x.url+'" target="_blank" rel="noopener">&#128279; link</a></span>';
   if(x.ref)meta+='<span class="ref-tag">REF</span>';
   if(!x.ref&&!isDone)meta+='<select class="statussel" data-act="status" data-id="'+x.id+'">'+SECTION_ORDER.map(s=>'<option value="'+s+'" '+(x.status===s?'selected':'')+'>'+STATUS[s].short+'</option>').join('')+'</select>';
-  if(isSub&&!FOCUSMODE)meta+='<span class="chip mv" data-act="up" data-id="'+x.id+'" title="Move up">&#9650;</span><span class="chip mv" data-act="down" data-id="'+x.id+'" title="Move down">&#9660;</span>';
+  if(isSub)meta+='<span class="chip mv" data-act="up" data-id="'+x.id+'" title="Move up">&#9650;</span><span class="chip mv" data-act="down" data-id="'+x.id+'" title="Move down">&#9660;</span>';
+  if(!x.ref)meta+='<span class="chip del" data-act="del" data-id="'+x.id+'" title="Delete this task">&#128465;</span>';
   return '<div class="task '+(isSub?'sub':'')+' '+(dimmed?'dim':'')+' '+(isDone?'isdone':'')+' '+(x.pinned?'pinned':'')+' '+(isOpen?'open':'')+'" data-id="'+x.id+'">'+
     (!x.ref?'<div class="check '+(isDone?'on':'')+'" data-act="check" data-id="'+x.id+'" title="Mark done"></div>':'<div style="width:19px;flex:none"></div>')+
     '<div class="tmain"><div class="ttl">'+(x.pinned?'<span class="pin">&#128204; THE ONE</span>':'')+'<span class="dot '+x.status+'" style="width:9px;height:9px;vertical-align:middle;margin-right:7px"></span>'+escapeHtml(x.title)+'</div>'+
@@ -555,6 +558,7 @@ board.addEventListener('click',e=>{
   else if(act==='dismiss'){state.parked=state.parked.filter(p=>p.id!==pid);toast('Dismissed. Good call \u2014 not every idea earns a slot.');render();}
   else if(act==='up'){moveTask(id,-1);render();}
   else if(act==='down'){moveTask(id,1);render();}
+  else if(act==='del'){deleteTask(id);}
 });
 board.addEventListener('change',e=>{const el=e.target.closest('[data-act="status"]');if(el){setStatus(el.dataset.id,el.value);render();}});
 board.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.dataset.addsub){e.preventDefault();addSub(e.target.dataset.addsub,e.target.value);render();}});
@@ -623,6 +627,17 @@ function moveTask(id,dir){
   if(!swapWith)return;
   const i=state.tasks.indexOf(me),j=state.tasks.indexOf(swapWith);
   state.tasks[i]=swapWith;state.tasks[j]=me;
+}
+function deleteTask(id){
+  const x=state.tasks.find(t=>t.id===id);if(!x)return;
+  const toDelete=new Set([id]);let changed=true;
+  while(changed){changed=false;for(const t of state.tasks){if(t.parentId&&toDelete.has(t.parentId)&&!toDelete.has(t.id)){toDelete.add(t.id);changed=true;}}}
+  const n=toDelete.size-1;
+  const msg='Delete \u201c'+x.title+'\u201d'+(n>0?' and its '+n+' sub-task'+(n>1?'s':''):'')+'?\n\nThis can\u2019t be undone.';
+  if(!confirm(msg))return;
+  state.tasks=state.tasks.filter(t=>!toDelete.has(t.id));
+  toDelete.forEach(d=>{delete state.ui.open[d];});
+  render();
 }
 function timeAgo(ts){const d=(Date.now()-ts)/1000;if(d<60)return'just now';if(d<3600)return Math.floor(d/60)+'m ago';if(d<86400)return Math.floor(d/3600)+'h ago';return Math.floor(d/86400)+'d ago';}
 
