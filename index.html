@@ -119,6 +119,16 @@ body{
 .chip.mv:hover{color:var(--accent);border-color:#3a4556}
 .chip.del{color:var(--muted-2)}
 .chip.del:hover{color:var(--red);border-color:var(--red)}
+.resume{margin:7px 0 2px;background:rgba(43,208,122,.08);border:1px solid rgba(43,208,122,.25);border-radius:9px;padding:8px 11px;font-size:13px;color:#bdf0d2;cursor:pointer;transition:.12s;line-height:1.4}
+.resume:hover{border-color:rgba(43,208,122,.55)}
+.resume.muted{background:none;border-style:dashed;border-color:var(--line);color:var(--muted-2)}
+.resume.editing{padding:0;background:none;border:none}
+.resume-input{width:100%;background:var(--panel-2);border:1px solid var(--green);border-radius:9px;padding:8px 11px;color:var(--txt);font-family:var(--body);font-size:13px;outline:none}
+.logrow{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+#actualInput{flex:1;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:12px 13px;color:var(--txt);font-family:var(--mono);font-size:17px;outline:none}
+#actualInput:focus{border-color:var(--accent)}
+.logrow .unit{font-family:var(--mono);color:var(--muted);font-size:13px}
+.logcmp{font-size:13px;color:var(--muted);margin-bottom:18px;min-height:18px}
 .chip a{color:var(--accent);text-decoration:none}
 .ref-tag{font-family:var(--mono);font-size:10px;color:var(--muted-2);border:1px solid var(--line-soft);padding:1px 6px;border-radius:6px}
 select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2);color:var(--muted);border:1px solid var(--line-soft);border-radius:7px;padding:2px 6px;cursor:pointer;outline:none}
@@ -236,10 +246,11 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
     <div class="legend" id="legend"></div>
   </div>
 
-  <div class="foot">Tempo &middot; synced to your private GitHub repo &middot; <b style="color:var(--accent)">build v4</b></div>
+  <div class="foot">Tempo &middot; synced to your private GitHub repo &middot; <b style="color:var(--accent)">build v5</b></div>
 </div>
 
 <div class="overlay" id="overlay"><div class="focus" id="focusCard"></div></div>
+<div class="overlay" id="logOverlay"><div class="focus" id="logCard" style="max-width:420px"></div></div>
 
 <!-- connect overlay -->
 <div class="overlay" id="connectOverlay">
@@ -309,7 +320,7 @@ const FOCUS_STATUSES=['progress'];
 function emptySeed(){
   const now=Date.now();
   return {
-    tasks:[{id:'welcome',title:'This is Tempo. Add your first task with + Task \u2014 or check this one off to watch the confetti. \ud83c\udf89',status:'next',est:5,parentId:null,url:null,pinned:true,firstStep:'Hit + Task up top and type literally anything. 2 min.',ref:false,createdAt:now,completedAt:null}],
+    tasks:[{id:'welcome',title:'This is Tempo. Add your first task with + Task \u2014 or check this one off to watch the confetti. \ud83c\udf89',status:'next',est:5,parentId:null,url:null,pinned:true,firstStep:'Hit + Task up top and type literally anything. 2 min.',resumeLine:'',actualMinutes:null,ref:false,createdAt:now,completedAt:null}],
     parked:[], meta:{doneDate:todayKey(),doneToday:0}, ui:{collapsed:{done:true,idea:true},open:{}}
   };
 }
@@ -331,7 +342,7 @@ function normalize(o){
   s.ui.open=s.ui.open||{};
   if(typeof s.meta.doneToday!=='number')s.meta.doneToday=0;
   if(!s.meta.doneDate)s.meta.doneDate=todayKey();
-  s.tasks=s.tasks.map(t=>Object.assign({est:null,parentId:null,url:null,pinned:false,firstStep:null,ref:false,createdAt:Date.now(),completedAt:null,status:'team',title:'(untitled)'},t));
+  s.tasks=s.tasks.map(t=>Object.assign({est:null,parentId:null,url:null,pinned:false,firstStep:null,resumeLine:'',actualMinutes:null,ref:false,createdAt:Date.now(),completedAt:null,status:'team',title:'(untitled)'},t));
   return s;
 }
 
@@ -420,6 +431,7 @@ function startPolling(){
 /* ===================== rendering ===================== */
 let view='focus';
 let FOCUSMODE=false;
+let editingResume=null;
 const board=document.getElementById('board');
 function render(){
   if(!state)return;
@@ -430,10 +442,15 @@ function render(){
 }
 function renderStats(){
   const inprog=state.tasks.filter(x=>x.status==='progress'&&!x.ref).length;
+  const cal=calibration();
+  let calHtml;
+  if(cal){const r=cal.ratio,pct=Math.round(Math.abs(r-1)*100);const phrase=pct<=10?'spot on':(r>1?'~'+pct+'% over':'~'+pct+'% under');const col=pct<=10?'var(--green)':(r>1?'var(--orange)':'var(--accent)');calHtml='<div class="stat" title="Rolling actual \u00f7 estimate over your last '+cal.n+' finished tasks. Pad new estimates by this.">'+'<div class="n" style="color:'+col+'">\u00d7'+r.toFixed(1)+'</div><div class="l">'+phrase+'</div></div>';}
+  else calHtml='<div class="stat" title="Finish a couple of estimated tasks and log actual time to calibrate."><div class="n" style="color:var(--muted-2)">\u2014</div><div class="l">calibrating</div></div>';
   document.getElementById('stats').innerHTML=
     '<div class="stat"><div class="n" style="color:var(--green)">'+inprog+'</div><div class="l">In progress</div></div>'+
     '<div class="stat"><div class="n" style="color:var(--yellow)">'+state.parked.length+'</div><div class="l">Parked</div></div>'+
-    '<div class="stat"><div class="n" style="color:var(--accent)">'+state.meta.doneToday+'</div><div class="l">Done today</div></div>';
+    '<div class="stat"><div class="n" style="color:var(--accent)">'+state.meta.doneToday+'</div><div class="l">Done today</div></div>'+
+    calHtml;
 }
 function renderTabCounts(){
   document.getElementById('cFocus').textContent=focusTops().length||'';
@@ -457,14 +474,22 @@ function taskHTML(x,isSub){
       else meta+='<span class="chip" data-act="edit-est" data-id="'+x.id+'" style="border-style:dashed;color:var(--accent)">&#9201; + add estimate</span>';
     }
   }
+  if(isDone&&(x.actualMinutes||x.est)){let s=x.est?'~'+fmtMin(x.est):'';if(x.actualMinutes){s+=(s?' \u00b7 ':'')+'actual '+fmtMin(x.actualMinutes);if(x.est){const a=accuracy(x.est,x.actualMinutes);s+=' \u00b7 '+a.text;}}if(s)meta+='<span class="chip" style="cursor:default" title="estimate vs actual">&#9201; '+s+'</span>';}
   if(x.url)meta+='<span class="chip"><a href="'+x.url+'" target="_blank" rel="noopener">&#128279; link</a></span>';
   if(x.ref)meta+='<span class="ref-tag">REF</span>';
   if(!x.ref&&!isDone)meta+='<select class="statussel" data-act="status" data-id="'+x.id+'">'+SECTION_ORDER.map(s=>'<option value="'+s+'" '+(x.status===s?'selected':'')+'>'+STATUS[s].short+'</option>').join('')+'</select>';
   if(isSub)meta+='<span class="chip mv" data-act="up" data-id="'+x.id+'" title="Move up">&#9650;</span><span class="chip mv" data-act="down" data-id="'+x.id+'" title="Move down">&#9660;</span>';
   if(!x.ref)meta+='<span class="chip del" data-act="del" data-id="'+x.id+'" title="Delete this task">&#128465;</span>';
+  let resumeBlock='';
+  if(x.status==='progress'&&!x.ref){
+    if(editingResume===x.id)resumeBlock='<div class="resume editing"><input class="resume-input" data-resumeedit="'+x.id+'" value="'+escapeHtml(x.resumeLine||'')+'" placeholder="next physical action \u2014 the exact thing to do first"></div>';
+    else if(x.resumeLine)resumeBlock='<div class="resume" data-act="edit-resume" data-id="'+x.id+'" title="Click to edit your resume note">&#8592; '+escapeHtml(x.resumeLine)+'</div>';
+    else resumeBlock='<div class="resume muted" data-act="edit-resume" data-id="'+x.id+'">&#8592; add a resume note</div>';
+  }
   return '<div class="task '+(isSub?'sub':'')+' '+(dimmed?'dim':'')+' '+(isDone?'isdone':'')+' '+(x.pinned?'pinned':'')+' '+(isOpen?'open':'')+'" data-id="'+x.id+'">'+
     (!x.ref?'<div class="check '+(isDone?'on':'')+'" data-act="check" data-id="'+x.id+'" title="Mark done"></div>':'<div style="width:19px;flex:none"></div>')+
     '<div class="tmain"><div class="ttl">'+(x.pinned?'<span class="pin">&#128204; THE ONE</span>':'')+'<span class="dot '+x.status+'" style="width:9px;height:9px;vertical-align:middle;margin-right:7px"></span>'+escapeHtml(x.title)+'</div>'+
+    resumeBlock+
     ((isOpen&&x.firstStep)?'<div class="firststep"><b>Start here &middot; on-ramp</b>'+escapeHtml(x.firstStep)+'</div>':'')+
     '<div class="tmeta">'+meta+'</div></div>'+
     '<div class="expand"><span class="caret" data-act="toggle" data-id="'+x.id+'">'+(hasKids?'&#9660;':'&#43;')+'</span></div></div>'+
@@ -531,20 +556,57 @@ function toggleTimer(btn){if(timerInt){stopTimer();if(btn)btn.innerHTML='&#9654;
 function stopTimer(){if(timerInt){timerElapsed+=Math.floor((Date.now()-timerStart)/1000);clearInterval(timerInt);timerInt=null;}}
 
 /* ===================== mutations ===================== */
-function completeTask(id,silent){
+function completeTask(id,silent,suggested){
   const x=state.tasks.find(t=>t.id===id);if(!x)return;
   const goingDone=x.status!=='done';
   x.status=goingDone?'done':'progress';x.completedAt=goingDone?Date.now():null;
-  if(goingDone){kids(id).forEach(c=>{if(c.status!=='done'&&!c.ref){c.status='done';c.completedAt=Date.now();}});state.meta.doneToday++;if(!silent){confetti();toast(pickFinishLine());}}
+  if(goingDone){
+    kids(id).forEach(c=>{if(c.status!=='done'&&!c.ref){c.status='done';c.completedAt=Date.now();}});
+    state.meta.doneToday++;
+    if(!silent)openLog(id,suggested); else {/* silent: no prompt */}
+  }
 }
 const FINISH_LINES=['Finished. <b>Actually</b> finished. Look at you. &#127881;','Closed it out \u2014 the part most people skip. &#128170;','Done and dusted. Momentum\u2019s yours, ride it.','One fewer open loop in your head. Feels good, right?','That\u2019s a finish, not a \u201cmoved-on.\u201d Big difference. &#9889;'];
 function pickFinishLine(){return FINISH_LINES[Math.floor(Math.random()*FINISH_LINES.length)];}
-function setStatus(id,s){const x=state.tasks.find(t=>t.id===id);if(x){x.status=s;if(s==='done'){x.completedAt=Date.now();state.meta.doneToday++;confetti();}}}
+function celebrate(){confetti();toast(pickFinishLine());}
+function accuracy(est,actual){const r=actual/est,pct=Math.round(Math.abs(r-1)*100);if(pct<=10)return{text:'right on the nose',color:'var(--green)'};if(r>1)return{text:'+'+pct+'% over',color:'var(--orange)'};return{text:'-'+pct+'% under',color:'var(--accent)'};}
+function calibration(){
+  const leaves=state.tasks.filter(t=>t.status==='done'&&t.actualMinutes>0&&t.est>0&&kids(t.id).filter(c=>!c.ref).length===0);
+  leaves.sort((a,b)=>(b.completedAt||0)-(a.completedAt||0));
+  const recent=leaves.slice(0,10);
+  if(recent.length<2)return null;
+  const sa=recent.reduce((s,t)=>s+t.actualMinutes,0),se=recent.reduce((s,t)=>s+t.est,0);
+  if(!se)return null;
+  return{ratio:sa/se,n:recent.length};
+}
+let logTaskId=null;
+function openLog(id,suggested){
+  const x=state.tasks.find(t=>t.id===id);if(!x){celebrate();return;}
+  logTaskId=id;
+  const estM=rollupEst(x);
+  const pre=(suggested&&suggested>0)?Math.round(suggested):'';
+  document.getElementById('logCard').innerHTML=
+    '<button class="xclose" data-act="logskip">&times;</button>'+
+    '<div class="kicker">&#127881; done \u2014 quick calibration</div>'+
+    '<h2>How long did that actually take?</h2>'+
+    '<div class="ctx">'+escapeHtml(x.title)+'</div>'+
+    '<div class="logrow"><input id="actualInput" type="number" min="0" inputmode="numeric" placeholder="minutes" value="'+pre+'"><span class="unit">min</span></div>'+
+    '<div class="logcmp" id="logCmp"></div>'+
+    '<div class="fbtns"><button class="btn primary" data-act="logsave">Log it</button><button class="btn ghost" data-act="logskip">Skip</button></div>';
+  document.getElementById('logOverlay').classList.add('on');
+  const inp=document.getElementById('actualInput'),cmp=document.getElementById('logCmp');
+  const upd=()=>{const v=parseInt(inp.value,10);if(!estM){cmp.textContent='No estimate on this one \u2014 nothing to compare.';return;}if(isNaN(v)||v<=0){cmp.textContent='Estimate was ~'+fmtMin(estM)+'.';return;}const a=accuracy(estM,v);cmp.innerHTML='Estimate ~'+fmtMin(estM)+' &middot; <b style="color:'+a.color+'">'+a.text+'</b>';};
+  inp.addEventListener('input',upd);
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();document.querySelector('[data-act="logsave"]').click();}});
+  upd();inp.focus();
+}
+function closeLog(){document.getElementById('logOverlay').classList.remove('on');}
+function setStatus(id,s){const x=state.tasks.find(t=>t.id===id);if(!x)return;if(s==='done'){completeTask(id);return;}x.status=s;}
 function editEst(id){const x=state.tasks.find(t=>t.id===id);if(!x)return;const v=prompt('Estimate in minutes for:\n\n'+x.title+'\n\n(numbers only \u2014 small first steps beat scary big ones)',x.est||'');if(v===null)return;const n=parseInt(v,10);x.est=isNaN(n)?null:n;render();}
 function parkIdea(text){if(!text.trim())return;state.parked.unshift({id:uid(),text:text.trim(),createdAt:Date.now()});toast('Parked. It\u2019s safe. <b>Eyes back on the prize.</b> &#128064;');}
-function promoteParked(pid){const i=state.parked.findIndex(p=>p.id===pid);if(i<0)return;const p=state.parked.splice(i,1)[0];state.tasks.push({id:uid(),title:p.text,status:'idea',est:null,parentId:null,url:null,pinned:false,firstStep:null,ref:false,createdAt:Date.now(),completedAt:null});toast('Promoted to an Idea \u2014 it\u2019s on the board now.');view='all';syncTabs();}
-function addTask(){const title=prompt('New task \u2014 what is it?');if(!title||!title.trim())return;const est=prompt('Rough estimate in minutes? (leave blank if unsure)','');const n=parseInt(est,10);state.tasks.push({id:uid(),title:title.trim(),status:'next',est:isNaN(n)?null:n,parentId:null,url:null,pinned:false,firstStep:null,ref:false,createdAt:Date.now(),completedAt:null});toast('Added to <b>Next Priority</b>. Set its status whenever.');}
-function addSub(pid,title){if(!title.trim())return;const parent=state.tasks.find(t=>t.id===pid);state.tasks.push({id:uid(),title:title.trim(),status:parent?parent.status:'team',est:null,parentId:pid,url:null,pinned:false,firstStep:null,ref:false,createdAt:Date.now(),completedAt:null});state.ui.open[pid]=true;}
+function promoteParked(pid){const i=state.parked.findIndex(p=>p.id===pid);if(i<0)return;const p=state.parked.splice(i,1)[0];state.tasks.push({id:uid(),title:p.text,status:'idea',est:null,parentId:null,url:null,pinned:false,firstStep:null,resumeLine:'',actualMinutes:null,ref:false,createdAt:Date.now(),completedAt:null});toast('Promoted to an Idea \u2014 it\u2019s on the board now.');view='all';syncTabs();}
+function addTask(){const title=prompt('New task \u2014 what is it?');if(!title||!title.trim())return;const est=prompt('Rough estimate in minutes? (leave blank if unsure)','');const n=parseInt(est,10);state.tasks.push({id:uid(),title:title.trim(),status:'next',est:isNaN(n)?null:n,parentId:null,url:null,pinned:false,firstStep:null,resumeLine:'',actualMinutes:null,ref:false,createdAt:Date.now(),completedAt:null});toast('Added to <b>Next Priority</b>. Set its status whenever.');}
+function addSub(pid,title){if(!title.trim())return;const parent=state.tasks.find(t=>t.id===pid);state.tasks.push({id:uid(),title:title.trim(),status:parent?parent.status:'team',est:null,parentId:pid,url:null,pinned:false,firstStep:null,resumeLine:'',actualMinutes:null,ref:false,createdAt:Date.now(),completedAt:null});state.ui.open[pid]=true;}
 
 /* ===================== events ===================== */
 board.addEventListener('click',e=>{
@@ -559,17 +621,28 @@ board.addEventListener('click',e=>{
   else if(act==='up'){moveTask(id,-1);render();}
   else if(act==='down'){moveTask(id,1);render();}
   else if(act==='del'){deleteTask(id);}
+  else if(act==='edit-resume'){editingResume=id;render();const i=document.querySelector('[data-resumeedit="'+id+'"]');if(i){i.focus();try{i.setSelectionRange(i.value.length,i.value.length);}catch(e){}}}
 });
 board.addEventListener('change',e=>{const el=e.target.closest('[data-act="status"]');if(el){setStatus(el.dataset.id,el.value);render();}});
-board.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.dataset.addsub){e.preventDefault();addSub(e.target.dataset.addsub,e.target.value);render();}});
+board.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&e.target.dataset.addsub){e.preventDefault();addSub(e.target.dataset.addsub,e.target.value);render();}
+  else if(e.target.dataset.resumeedit){if(e.key==='Enter'){e.preventDefault();e.target.blur();}else if(e.key==='Escape'){editingResume=null;render();}}
+});
+board.addEventListener('focusout',e=>{if(e.target.dataset&&e.target.dataset.resumeedit){const t=state.tasks.find(t=>t.id===e.target.dataset.resumeedit);if(t)t.resumeLine=e.target.value.trim();editingResume=null;render();}});
 document.getElementById('focusCard').addEventListener('click',e=>{
   const el=e.target.closest('[data-act]');if(!el)return;const act=el.dataset.act;
   if(act==='closefocus')closeFocus();else if(act==='timer')toggleTimer(el);
-  else if(act==='fdone'){completeTask(timerTaskId);closeFocus();render();}
+  else if(act==='fdone'){stopTimer();const sug=Math.round(timerElapsed/60);closeFocus();completeTask(timerTaskId,false,sug);render();}
   else if(act==='fpark'){const cur=state.tasks.find(t=>t.id===timerTaskId);if(cur&&cur.status==='progress')cur.status='next';closeFocus();openPick();}
   else if(act==='fcheck'){completeTask(el.dataset.id,true);render();openFocus(timerTaskId);}
 });
 document.getElementById('overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeFocus();});
+document.getElementById('logCard').addEventListener('click',e=>{
+  const el=e.target.closest('[data-act]');if(!el)return;const act=el.dataset.act;
+  if(act==='logsave'){const v=parseInt(document.getElementById('actualInput').value,10);const t=state.tasks.find(t=>t.id===logTaskId);if(t&&!isNaN(v)&&v>0)t.actualMinutes=v;closeLog();render();celebrate();}
+  else if(act==='logskip'){closeLog();render();celebrate();}
+});
+document.getElementById('logOverlay').addEventListener('click',e=>{if(e.target.id==='logOverlay'){closeLog();render();celebrate();}});
 document.getElementById('parkForm').addEventListener('submit',e=>{e.preventDefault();const inp=document.getElementById('parkInput');parkIdea(inp.value);inp.value='';render();});
 document.getElementById('pickBtn').onclick=openPick;
 document.getElementById('addBtn').onclick=()=>{addTask();render();};
