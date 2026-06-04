@@ -76,6 +76,11 @@ body{
 .tab{border:none;background:none;color:var(--muted);font-family:var(--body);font-weight:600;font-size:13.5px;padding:8px 16px;border-radius:9px;cursor:pointer;transition:.15s}
 .tab.on{background:var(--panel);color:var(--txt);box-shadow:0 2px 8px rgba(0,0,0,.3)}
 .tab .c{font-family:var(--mono);font-size:11px;color:var(--muted-2);margin-left:5px}
+.dfilter{display:flex;align-items:center;gap:6px;margin:-6px 0 16px;flex-wrap:wrap}
+.dlabel{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2);margin-right:2px}
+.dpill{border:1px solid var(--line-soft);background:var(--panel-2);color:var(--muted);font-family:var(--body);font-weight:600;font-size:12px;padding:4px 12px;border-radius:999px;cursor:pointer;transition:.12s}
+.dpill:hover{color:var(--txt);border-color:var(--line)}
+.dpill.on{color:var(--accent);border-color:var(--accent);background:rgba(110,168,255,.10)}
 
 .section{margin-bottom:14px;animation:rise .4s ease both}
 .shead{display:flex;align-items:center;gap:10px;cursor:pointer;padding:6px 2px;user-select:none}
@@ -115,6 +120,8 @@ body{
 .chip{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--panel-2);border:1px solid var(--line-soft);padding:2px 8px;border-radius:7px;cursor:pointer;transition:.12s}
 .chip:hover{border-color:#3a4556;color:var(--txt)}
 .chip.est{color:#cdd5e3}
+.chip.dom{font-family:var(--body);font-weight:600;font-size:11px;color:var(--muted)}
+.chip.dom:hover{color:var(--txt);border-color:var(--accent)}
 .chip.mv{padding:2px 7px;color:var(--muted-2)}
 .chip.mv:hover{color:var(--accent);border-color:#3a4556}
 .chip.del{color:var(--muted-2)}
@@ -254,12 +261,20 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
       <button class="tab" data-view="parked">Parked <span class="c" id="cParked"></span></button>
     </div>
 
+    <div class="dfilter" id="dfilter">
+      <span class="dlabel">area</span>
+      <button class="dpill on" data-domain="all">All</button>
+      <button class="dpill" data-domain="work">Work</button>
+      <button class="dpill" data-domain="fun">Fun</button>
+      <button class="dpill" data-domain="growth">Growth</button>
+    </div>
+
     <div id="board"></div>
 
     <div class="legend" id="legend"></div>
   </div>
 
-  <div class="foot">Tempo &middot; synced to your private GitHub repo &middot; <b style="color:var(--accent)">build v5.1</b></div>
+  <div class="foot">Tempo &middot; synced to your private GitHub repo &middot; <b style="color:var(--accent)">build v6</b></div>
 </div>
 
 <div class="overlay" id="overlay"><div class="focus" id="focusCard"></div></div>
@@ -329,12 +344,18 @@ const STATUS={
 };
 const SECTION_ORDER=['progress','next','lagging','help','team','idea','done'];
 const FOCUS_STATUSES=['progress'];
+const DOMAINS={work:'Work',fun:'Fun',growth:'Growth'};
+const DOMAIN_ORDER=['work','fun','growth'];
+let domainFilter='all';
+function domainOK(x){return domainFilter==='all'||x.domain===domainFilter;}
+function cycleDomain(id){const t=state.tasks.find(t=>t.id===id);if(!t)return;const i=DOMAIN_ORDER.indexOf(t.domain);t.domain=DOMAIN_ORDER[(i+1)%DOMAIN_ORDER.length];kids(t.id).forEach(c=>c.domain=t.domain);}
+function setDomainFilter(d){domainFilter=d;document.querySelectorAll('.dpill').forEach(p=>p.classList.toggle('on',p.dataset.domain===d));render();}
 
 /* ===================== empty starter (NO real data) ===================== */
 function emptySeed(){
   const now=Date.now();
   return {
-    tasks:[{id:'welcome',title:'This is Tempo. Add your first task with + Task \u2014 or check this one off to watch the confetti. \ud83c\udf89',status:'next',est:5,parentId:null,url:null,pinned:true,firstStep:'Hit + Task up top and type literally anything. 2 min.',resumeLine:'',actualMinutes:null,ref:false,createdAt:now,completedAt:null}],
+    tasks:[{id:'welcome',title:'This is Tempo. Add your first task with + Task \u2014 or check this one off to watch the confetti. \ud83c\udf89',status:'next',est:5,parentId:null,url:null,pinned:true,firstStep:'Hit + Task up top and type literally anything. 2 min.',resumeLine:'',actualMinutes:null,domain:'work',ref:false,createdAt:now,completedAt:null}],
     parked:[], meta:{doneDate:todayKey(),doneToday:0}, ui:{collapsed:{done:true,idea:true},open:{}}
   };
 }
@@ -357,7 +378,7 @@ function normalize(o){
   s.ui.open=s.ui.open||{};
   if(typeof s.meta.doneToday!=='number')s.meta.doneToday=0;
   if(!s.meta.doneDate)s.meta.doneDate=todayKey();
-  s.tasks=s.tasks.map(t=>Object.assign({est:null,parentId:null,url:null,pinned:false,firstStep:null,resumeLine:'',actualMinutes:null,ref:false,createdAt:Date.now(),completedAt:null,status:'team',title:'(untitled)'},t));
+  s.tasks=s.tasks.map(t=>Object.assign({est:null,parentId:null,url:null,pinned:false,firstStep:null,resumeLine:'',actualMinutes:null,domain:'work',ref:false,createdAt:Date.now(),completedAt:null,status:'team',title:'(untitled)'},t));
   return s;
 }
 
@@ -469,7 +490,7 @@ function renderStats(){
 }
 function renderTabCounts(){
   document.getElementById('cFocus').textContent=focusTops().length||'';
-  document.getElementById('cAll').textContent=state.tasks.filter(x=>actionable(x)).length;
+  document.getElementById('cAll').textContent=state.tasks.filter(x=>actionable(x)&&domainOK(x)).length;
   document.getElementById('cParked').textContent=state.parked.length||'';
 }
 function taskHTML(x,isSub){
@@ -493,6 +514,7 @@ function taskHTML(x,isSub){
   if(x.url)meta+='<span class="chip"><a href="'+x.url+'" target="_blank" rel="noopener">&#128279; link</a></span>';
   if(x.ref)meta+='<span class="ref-tag">REF</span>';
   if(!x.ref&&!isDone)meta+='<select class="statussel" data-act="status" data-id="'+x.id+'">'+SECTION_ORDER.map(s=>'<option value="'+s+'" '+(x.status===s?'selected':'')+'>'+STATUS[s].short+'</option>').join('')+'</select>';
+  if(!x.ref&&!isDone&&x.parentId===null)meta+='<span class="chip dom" data-act="domain" data-id="'+x.id+'" title="Life area \u2014 click to cycle Work / Fun / Growth">'+DOMAINS[x.domain]+'</span>';
   if(isSub)meta+='<span class="chip mv" data-act="up" data-id="'+x.id+'" title="Move up">&#9650;</span><span class="chip mv" data-act="down" data-id="'+x.id+'" title="Move down">&#9660;</span>';
   if(!x.ref)meta+='<span class="chip del" data-act="del" data-id="'+x.id+'" title="Delete this task">&#128465;</span>';
   let resumeBlock='';
@@ -516,7 +538,7 @@ function renderChildren(pid){
   return '<div class="children">'+html+'</div>';
 }
 function hasProgressDescendant(x){return kids(x.id).some(c=>!c.ref&&(c.status==='progress'||hasProgressDescendant(c)));}
-function focusTops(){return state.tasks.filter(x=>!x.ref&&x.parentId===null&&(x.status==='progress'||hasProgressDescendant(x)));}
+function focusTops(){return state.tasks.filter(x=>!x.ref&&x.parentId===null&&domainOK(x)&&(x.status==='progress'||hasProgressDescendant(x)));}
 function renderFocusView(){
   const items=focusTops();
   if(!items.length){
@@ -531,7 +553,7 @@ function renderFocusView(){
 function renderAllView(){
   let html='';
   for(const s of SECTION_ORDER){
-    const tops=state.tasks.filter(x=>x.status===s&&x.parentId===null);if(!tops.length)continue;
+    const tops=state.tasks.filter(x=>x.status===s&&x.parentId===null&&domainOK(x));if(!tops.length)continue;
     const collapsed=state.ui.collapsed[s],totEst=tops.reduce((a,x)=>a+(rollupEst(x)||0),0);
     html+='<div class="section '+(collapsed?'collapsed':'')+'" data-sec="'+s+'"><div class="shead" data-act="sec" data-sec="'+s+'"><span class="dot '+s+'"></span><h2>'+STATUS[s].label+'</h2><span class="cnt">'+tops.length+'</span>'+((totEst&&s!=='done')?'<span class="est">&#9201; ~'+fmtMin(totEst)+' total</span>':'<span class="est"></span>')+'<span class="car">&#9660;</span></div><div class="slist">'+tops.map(x=>taskHTML(x,false)).join('')+'</div></div>';
   }
@@ -619,9 +641,9 @@ function closeLog(){document.getElementById('logOverlay').classList.remove('on')
 function setStatus(id,s){const x=state.tasks.find(t=>t.id===id);if(!x)return;if(s==='done'){completeTask(id);return;}x.status=s;}
 function editEst(id){const x=state.tasks.find(t=>t.id===id);if(!x)return;const v=prompt('Estimate in minutes for:\n\n'+x.title+'\n\n(numbers only \u2014 small first steps beat scary big ones)',x.est||'');if(v===null)return;const n=parseInt(v,10);x.est=isNaN(n)?null:n;render();}
 function parkIdea(text){if(!text.trim())return;state.parked.unshift({id:uid(),text:text.trim(),createdAt:Date.now()});toast('Parked. It\u2019s safe. <b>Eyes back on the prize.</b> &#128064;');}
-function promoteParked(pid){const i=state.parked.findIndex(p=>p.id===pid);if(i<0)return;const p=state.parked.splice(i,1)[0];state.tasks.push({id:uid(),title:p.text,status:'idea',est:null,parentId:null,url:null,pinned:false,firstStep:null,resumeLine:'',actualMinutes:null,ref:false,createdAt:Date.now(),completedAt:null});toast('Promoted to an Idea \u2014 it\u2019s on the board now.');view='all';syncTabs();}
-function addTask(){const title=prompt('New task \u2014 what is it?');if(!title||!title.trim())return;const est=prompt('Rough estimate in minutes? (leave blank if unsure)','');const n=parseInt(est,10);state.tasks.push({id:uid(),title:title.trim(),status:'next',est:isNaN(n)?null:n,parentId:null,url:null,pinned:false,firstStep:null,resumeLine:'',actualMinutes:null,ref:false,createdAt:Date.now(),completedAt:null});toast('Added to <b>Next Priority</b>. Set its status whenever.');}
-function addSub(pid,title){if(!title.trim())return;const parent=state.tasks.find(t=>t.id===pid);state.tasks.push({id:uid(),title:title.trim(),status:parent?parent.status:'team',est:null,parentId:pid,url:null,pinned:false,firstStep:null,resumeLine:'',actualMinutes:null,ref:false,createdAt:Date.now(),completedAt:null});state.ui.open[pid]=true;}
+function promoteParked(pid){const i=state.parked.findIndex(p=>p.id===pid);if(i<0)return;const p=state.parked.splice(i,1)[0];state.tasks.push({id:uid(),title:p.text,status:'idea',est:null,parentId:null,url:null,pinned:false,firstStep:null,resumeLine:'',actualMinutes:null,domain:domainFilter==='all'?'work':domainFilter,ref:false,createdAt:Date.now(),completedAt:null});toast('Promoted to an Idea \u2014 it\u2019s on the board now.');view='all';syncTabs();}
+function addTask(){const title=prompt('New task \u2014 what is it?');if(!title||!title.trim())return;const est=prompt('Rough estimate in minutes? (leave blank if unsure)','');const n=parseInt(est,10);state.tasks.push({id:uid(),title:title.trim(),status:'next',est:isNaN(n)?null:n,parentId:null,url:null,pinned:false,firstStep:null,resumeLine:'',actualMinutes:null,domain:domainFilter==='all'?'work':domainFilter,ref:false,createdAt:Date.now(),completedAt:null});toast('Added to <b>Next Priority</b>. Set its status whenever.');}
+function addSub(pid,title){if(!title.trim())return;const parent=state.tasks.find(t=>t.id===pid);state.tasks.push({id:uid(),title:title.trim(),status:parent?parent.status:'team',est:null,parentId:pid,url:null,pinned:false,firstStep:null,resumeLine:'',actualMinutes:null,domain:parent?parent.domain:'work',ref:false,createdAt:Date.now(),completedAt:null});state.ui.open[pid]=true;}
 
 /* ===================== events ===================== */
 board.addEventListener('click',e=>{
@@ -636,6 +658,7 @@ board.addEventListener('click',e=>{
   else if(act==='up'){moveTask(id,-1);render();}
   else if(act==='down'){moveTask(id,1);render();}
   else if(act==='del'){deleteTask(id);}
+  else if(act==='domain'){cycleDomain(id);render();}
   else if(act==='edit-resume'){editingResume=id;render();const i=document.querySelector('[data-resumeedit="'+id+'"]');if(i){i.focus();try{i.setSelectionRange(i.value.length,i.value.length);}catch(e){}}}
 });
 board.addEventListener('change',e=>{const el=e.target.closest('[data-act="status"]');if(el){setStatus(el.dataset.id,el.value);render();}});
@@ -698,6 +721,7 @@ document.getElementById('pickBtn').onclick=openPick;
 document.getElementById('addBtn').onclick=()=>{addTask();render();};
 document.getElementById('wrapBtn').onclick=openWrap;
 document.getElementById('tabs').addEventListener('click',e=>{const t=e.target.closest('.tab');if(!t)return;view=t.dataset.view;syncTabs();render();});
+document.getElementById('dfilter').addEventListener('click',e=>{const p=e.target.closest('.dpill');if(!p)return;setDomainFilter(p.dataset.domain);});
 function syncTabs(){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.view===view));}
 
 /* sync menu */
