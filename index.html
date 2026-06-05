@@ -81,6 +81,12 @@ body{
 .dpill{border:1px solid var(--line-soft);background:var(--panel-2);color:var(--muted);font-family:var(--body);font-weight:600;font-size:12px;padding:4px 12px;border-radius:999px;cursor:pointer;transition:.12s}
 .dpill:hover{color:var(--txt);border-color:var(--line)}
 .dpill.on{color:var(--accent);border-color:var(--accent);background:rgba(110,168,255,.10)}
+.expbanner{display:flex;align-items:center;gap:14px;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;line-height:1.45}
+.expbanner .ebmsg{flex:1}
+.expbanner b{color:#fff}
+.expbanner .btn{white-space:nowrap;background:var(--panel);color:var(--txt);border:1px solid currentColor;font-weight:600}
+.expbanner.bad{background:rgba(241,91,91,.12);border:1px solid var(--red);color:#ffdada}
+.expbanner.warn{background:rgba(245,147,59,.13);border:1px solid var(--orange);color:#ffe7cf}
 
 .section{margin-bottom:14px;animation:rise .4s ease both}
 .shead{display:flex;align-items:center;gap:10px;cursor:pointer;padding:6px 2px;user-select:none}
@@ -244,6 +250,7 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
   </div>
 
   <div id="mainUI" class="hidden">
+    <div id="expBanner" class="expbanner" style="display:none"></div>
     <div class="bar">
       <form class="parkbox" id="parkForm">
         <span class="ic">&#128161;</span>
@@ -274,7 +281,7 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
     <div class="legend" id="legend"></div>
   </div>
 
-  <div class="foot">Tempo &middot; synced to your private GitHub repo &middot; <b style="color:var(--accent)">build v6</b></div>
+  <div class="foot">Tempo &middot; synced to your private GitHub repo &middot; <b style="color:var(--accent)">build v6.1</b></div>
 </div>
 
 <div class="overlay" id="overlay"><div class="focus" id="focusCard"></div></div>
@@ -290,6 +297,10 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
 
     <label>GitHub fine-grained token (gives this browser read/write to your board)</label>
     <input id="tokenInput" type="password" placeholder="github_pat_&hellip;" autocomplete="off" spellcheck="false">
+
+    <label>Token expiry date <span style="color:var(--muted-2);font-weight:400">&mdash; the date GitHub showed when you created it</span></label>
+    <input id="expInput" type="date">
+    <p class="note" style="margin:-8px 0 4px">Defaults to 30 days out. Tempo warns you a week before it lapses, so syncing never silently stops.</p>
 
     <details class="adv">
       <summary>Advanced &mdash; change owner / repo / branch</summary>
@@ -323,6 +334,7 @@ function lsSet(k,v){try{localStorage.setItem(k,v);}catch(e){}}
 function lsDel(k){try{localStorage.removeItem(k);}catch(e){}}
 
 const TOKEN_KEY='tempo-gh-token';
+const EXP_KEY='tempo-gh-exp';
 const GH={
   owner: lsGet('tempo-gh-owner') || 'SowmyaCVBS',
   repo:  lsGet('tempo-gh-repo')  || 'tempo-data',
@@ -331,6 +343,9 @@ const GH={
 };
 
 let token=null, state=null, remoteSha=null, dirty=false, saving=false, pollTimer=null;
+let tokenExpiry=null, authFailed=false;
+function isoDay(ms){const d=new Date(ms);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function tokenDaysLeft(){if(!tokenExpiry)return null;return Math.ceil((tokenExpiry-Date.now())/86400000);}
 
 /* ===================== status config ===================== */
 const STATUS={
@@ -395,9 +410,18 @@ function b64decode(b64){
 }
 
 /* ===================== GitHub API ===================== */
+function captureExp(r){
+  try{
+    const h=r.headers.get('GitHub-Authentication-Token-Expiration');
+    if(!h)return;
+    let t=Date.parse(h); if(isNaN(t))t=Date.parse(h.replace(' ','T'));
+    if(!isNaN(t)){tokenExpiry=t;lsSet(EXP_KEY,new Date(t).toISOString());}
+  }catch(e){}
+}
 async function ghGet(){
   const url='https://api.github.com/repos/'+GH.owner+'/'+GH.repo+'/contents/'+GH.path+'?ref='+encodeURIComponent(GH.branch)+'&t='+Date.now();
   const r=await fetch(url,{headers:{'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json'},cache:'no-store'});
+  captureExp(r);
   if(r.status===404)return{missing:true};
   if(r.status===401||r.status===403)throw{auth:true,status:r.status};
   if(!r.ok)throw{status:r.status};
@@ -409,6 +433,7 @@ async function ghPut(jsonStr,sha){
   const body={message:'tempo: update board '+new Date().toISOString(),content:b64encode(jsonStr),branch:GH.branch};
   if(sha)body.sha=sha;
   const r=await fetch(url,{method:'PUT',headers:{'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify(body)});
+  captureExp(r);
   if(r.status===401||r.status===403)throw{auth:true,status:r.status};
   if(r.status===409||r.status===422)throw{conflict:true,status:r.status};
   if(!r.ok)throw{status:r.status};
@@ -422,6 +447,25 @@ function setSync(stt){
   pill.classList.remove('ok','busy','bad');
   const map={saved:['ok','Synced'],saving:['busy','Saving\u2026'],syncing:['busy','Syncing\u2026'],offline:['bad','Offline'],autherr:['bad','Reconnect'],idle:['','\u2026']};
   const m=map[stt]||map.idle; if(m[0])pill.classList.add(m[0]); txt.textContent=m[1];
+  if(stt==='autherr')authFailed=true; else if(stt==='saved')authFailed=false;
+  updateBanner();
+}
+function updateBanner(){
+  const el=document.getElementById('expBanner'); if(!el)return;
+  if(!token){el.style.display='none';return;}
+  const d=tokenDaysLeft(); let kind=null,msg='';
+  if(authFailed||(d!==null&&d<=0)){
+    kind='bad';
+    msg='<b>Sync is down.</b> Your token has expired or been revoked, so edits are saving in <b>this browser only</b>. Reconnect with a fresh token now so nothing is lost.';
+  }else if(d!==null&&d<=7){
+    kind='warn';
+    msg='<b>Your sync token expires in '+d+' day'+(d===1?'':'s')+'</b> (on '+new Date(tokenExpiry).toLocaleDateString(undefined,{month:'short',day:'numeric'})+'). Replace it before then and syncing never skips a beat.';
+  }
+  if(!kind){el.style.display='none';return;}
+  el.className='expbanner '+kind;
+  el.innerHTML='<span class="ebmsg">'+(kind==='bad'?'\u26a0\ufe0f ':'\u23f3 ')+msg+'</span><button class="btn sm" id="ebFix">'+(kind==='bad'?'Reconnect':'Replace token')+'</button>';
+  el.style.display='flex';
+  document.getElementById('ebFix').onclick=showConnect;
 }
 async function pull(){
   if(!token)return false;
@@ -452,6 +496,7 @@ async function commit(initial){
 function startPolling(){
   clearInterval(pollTimer);
   pollTimer=setInterval(async()=>{
+    updateBanner();
     if(document.hidden||!token||dirty||saving||userIsTyping())return;
     try{
       const res=await ghGet();
@@ -741,6 +786,8 @@ function showConnect(){
   document.getElementById('ownerInput').value=GH.owner;
   document.getElementById('repoInput').value=GH.repo;
   document.getElementById('branchInput').value=GH.branch;
+  const se=lsGet(EXP_KEY);
+  document.getElementById('expInput').value=se?isoDay(Date.parse(se)):isoDay(Date.now()+30*864e5);
   setSync('idle');
 }
 function hideConnect(){document.getElementById('connectOverlay').classList.remove('on');document.getElementById('mainUI').classList.remove('hidden');}
@@ -753,13 +800,15 @@ async function doConnect(){
   GH.branch=(document.getElementById('branchInput').value.trim()||'main');
   lsSet('tempo-gh-owner',GH.owner);lsSet('tempo-gh-repo',GH.repo);lsSet('tempo-gh-branch',GH.branch);
   token=v;err.textContent='';setSync('syncing');
+  const expVal=document.getElementById('expInput').value;
+  if(expVal){const t=Date.parse(expVal+'T23:59:59');if(!isNaN(t)){tokenExpiry=t;lsSet(EXP_KEY,new Date(t).toISOString());}}
   const btn=document.getElementById('connectBtn');btn.disabled=true;
   const ok=await pull();
   btn.disabled=false;
   if(ok){lsSet(TOKEN_KEY,v);hideConnect();render();startPolling();toast('Connected. Your board is live. &#128279;');}
   else{token=null;err.textContent='Couldn\u2019t connect. Check: repo exists, token has Contents read/write on '+GH.owner+'/'+GH.repo+', and board.json was uploaded.';}
 }
-function disconnect(){lsDel(TOKEN_KEY);token=null;remoteSha=null;state=null;clearInterval(pollTimer);document.getElementById('tokenInput').value='';showConnect();toast('Disconnected. Token wiped from this browser.');}
+function disconnect(){lsDel(TOKEN_KEY);lsDel(EXP_KEY);token=null;tokenExpiry=null;authFailed=false;remoteSha=null;state=null;clearInterval(pollTimer);document.getElementById('tokenInput').value='';updateBanner();showConnect();toast('Disconnected. Token wiped from this browser.');}
 document.getElementById('connectBtn').addEventListener('click',doConnect);
 document.getElementById('tokenInput').addEventListener('keydown',e=>{if(e.key==='Enter')doConnect();});
 
@@ -795,10 +844,12 @@ document.getElementById('legend').innerHTML=SECTION_ORDER.map(s=>'<span><span cl
 /* ===================== boot ===================== */
 (async function(){
   token=lsGet(TOKEN_KEY);
+  const se=lsGet(EXP_KEY); if(se){const t=Date.parse(se); if(!isNaN(t))tokenExpiry=t;}
   if(!token){showConnect();return;}
   const ok=await pull();
   if(ok){hideConnect();render();startPolling();}
   else{showConnect();document.getElementById('connectErr').textContent='Saved token didn\u2019t work \u2014 it may have expired. Paste a fresh one.';}
+  updateBanner();
 })();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&token&&!dirty&&!saving&&!userIsTyping()){pull().then(ok=>{if(ok)render();});}});
 </script>
