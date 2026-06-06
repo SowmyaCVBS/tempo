@@ -281,7 +281,7 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
     <div class="legend" id="legend"></div>
   </div>
 
-  <div class="foot">Tempo &middot; synced to your private GitHub repo &middot; <b style="color:var(--accent)">build v6.1</b></div>
+  <div class="foot">Tempo &middot; synced to your private GitHub repo &middot; <b style="color:var(--accent)">build v6.2</b></div>
 </div>
 
 <div class="overlay" id="overlay"><div class="focus" id="focusCard"></div></div>
@@ -300,7 +300,7 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
 
     <label>Token expiry date <span style="color:var(--muted-2);font-weight:400">&mdash; the date GitHub showed when you created it</span></label>
     <input id="expInput" type="date">
-    <p class="note" style="margin:-8px 0 4px">Defaults to 90 days out. Tempo warns you a week before it lapses, so syncing never silently stops.</p>
+    <p class="note" style="margin:-8px 0 4px">Defaults to 30 days out. Tempo warns you a week before it lapses, so syncing never silently stops.</p>
 
     <details class="adv">
       <summary>Advanced &mdash; change owner / repo / branch</summary>
@@ -612,6 +612,8 @@ function renderParkedView(){
 
 /* ===================== focus modal ===================== */
 let timerInt=null,timerStart=0,timerElapsed=0,timerTaskId=null,timerTarget=0;
+let pipWin=null; const BASE_TITLE=document.title;
+const PIP_OK=('documentPictureInPicture' in window);
 function pickTask(){
   const pin=state.tasks.find(x=>x.pinned&&actionable(x));
   if(pin&&kids(pin.id).filter(c=>!c.ref).length===0)return pin;
@@ -629,13 +631,44 @@ function openFocus(id){
   if(x.firstStep)stepsHtml='<div class="step"><span class="dot progress" style="width:9px;height:9px"></span><div>'+escapeHtml(x.firstStep)+'</div></div>';
   else if(childSteps.length)stepsHtml=childSteps.map(c=>'<div class="step"><div class="check '+(c.status==='done'?'on':'')+'" data-act="fcheck" data-id="'+c.id+'"></div><div>'+escapeHtml(c.title)+'</div></div>').join('');
   else stepsHtml='<div class="step"><span class="dot next" style="width:9px;height:9px"></span><div>No sub-steps yet. First move: spend 2 minutes writing the very first concrete action \u2014 then do that.</div></div>';
-  document.getElementById('focusCard').innerHTML='<button class="xclose" data-act="closefocus">&times;</button><div class="kicker"><span class="dot '+x.status+'" style="width:9px;height:9px"></span>'+(parent?escapeHtml(parent.title)+' &rsaquo; ':'')+'your one thing</div><h2>'+escapeHtml(x.title)+'</h2><div class="ctx">Everything else can wait. The clock\u2019s the only thing watching \u2014 start it and beat the estimate.</div><div class="timer"><div class="clock" id="clock">00:00</div><div class="tgt">/ ~'+fmtMin(rollupEst(x)||25)+' target</div></div><div class="steps">'+stepsHtml+'</div><div class="fbtns"><button class="btn primary" data-act="timer">&#9654; Start clock</button><button class="btn" data-act="fdone">&#10003; Finished it</button><button class="btn ghost" data-act="fpark">Park &amp; pick another</button></div>';
+  document.getElementById('focusCard').innerHTML='<button class="xclose" data-act="closefocus">&times;</button><div class="kicker"><span class="dot '+x.status+'" style="width:9px;height:9px"></span>'+(parent?escapeHtml(parent.title)+' &rsaquo; ':'')+'your one thing</div><h2>'+escapeHtml(x.title)+'</h2><div class="ctx">Everything else can wait. The clock\u2019s the only thing watching \u2014 start it and beat the estimate.</div><div class="timer"><div class="clock" id="clock">00:00</div><div class="tgt">/ ~'+fmtMin(rollupEst(x)||25)+' target</div></div><div class="steps">'+stepsHtml+'</div><div class="fbtns"><button class="btn primary" data-act="timer">&#9654; Start clock</button><button class="btn" data-act="fdone">&#10003; Finished it</button>'+(PIP_OK?'<button class="btn ghost" data-act="pip" title="Float a mini timer on top of your other apps">&#10697; Pop out</button>':'')+'<button class="btn ghost" data-act="fpark">Park &amp; pick another</button></div>';
   document.getElementById('overlay').classList.add('on');updateClock();
 }
-function closeFocus(){document.getElementById('overlay').classList.remove('on');stopTimer();render();}
-function updateClock(){const el=document.getElementById('clock');if(!el)return;const tot=timerElapsed+(timerInt?Math.floor((Date.now()-timerStart)/1000):0);el.textContent=String(Math.floor(tot/60)).padStart(2,'0')+':'+String(tot%60).padStart(2,'0');el.classList.toggle('over',tot>timerTarget);}
-function toggleTimer(btn){if(timerInt){stopTimer();if(btn)btn.innerHTML='&#9654; Resume';}else{timerStart=Date.now();timerInt=setInterval(updateClock,500);if(btn)btn.innerHTML='&#10073;&#10073; Pause';}}
+function closeFocus(){document.getElementById('overlay').classList.remove('on');stopTimer();document.title=BASE_TITLE;if(pipWin&&!pipWin.closed){try{pipWin.close();}catch(e){}}pipWin=null;render();}
+function fmtClock(tot){return String(Math.floor(tot/60)).padStart(2,'0')+':'+String(tot%60).padStart(2,'0');}
+function updateClock(){
+  const tot=timerElapsed+(timerInt?Math.floor((Date.now()-timerStart)/1000):0);
+  const txt=fmtClock(tot), over=tot>timerTarget;
+  const el=document.getElementById('clock'); if(el){el.textContent=txt;el.classList.toggle('over',over);}
+  const x=state.tasks.find(t=>t.id===timerTaskId);
+  if(timerInt)document.title=(over?'\ud83d\udd34 ':'\u23f1\ufe0f ')+txt+(x?' \u00b7 '+x.title:'')+' \u2014 '+BASE_TITLE;
+  if(pipWin&&!pipWin.closed){const pe=pipWin.document.getElementById('pipClk'); if(pe){pe.textContent=txt;pe.classList.toggle('over',over);}}
+}
+function toggleTimer(btn){
+  if(timerInt){stopTimer();if(btn)btn.innerHTML='&#9654; Resume';const x=state.tasks.find(t=>t.id===timerTaskId);document.title='\u23f8\ufe0f '+(x?x.title+' \u2014 ':'')+BASE_TITLE;}
+  else{timerStart=Date.now();timerInt=setInterval(updateClock,500);if(btn)btn.innerHTML='&#10073;&#10073; Pause';updateClock();}
+}
 function stopTimer(){if(timerInt){timerElapsed+=Math.floor((Date.now()-timerStart)/1000);clearInterval(timerInt);timerInt=null;}}
+async function openPiP(){
+  if(!PIP_OK){toast('Floating timer needs Chrome or Edge \u2014 the tab-title timer still works everywhere.');return;}
+  if(pipWin&&!pipWin.closed){try{pipWin.focus();}catch(e){}return;}
+  try{pipWin=await documentPictureInPicture.requestWindow({width:240,height:148});}
+  catch(e){toast('Couldn\u2019t open the floating window.');return;}
+  const d=pipWin.document, st=d.createElement('style');
+  st.textContent='*{box-sizing:border-box}body{margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:#0f1319;color:#e8edf5;font-family:system-ui,sans-serif;-webkit-user-select:none;user-select:none}.ptask{font-size:12px;color:#9fb0c3;max-width:92%;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.clk{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:42px;font-weight:700;line-height:1;letter-spacing:1px}.clk.over{color:#f15b5b}.tg{font-size:11px;color:#6b7a8d}';
+  d.head.appendChild(st);
+  const mk=(c,id)=>{const e=d.createElement('div');e.className=c;e.id=id;return e;};
+  d.body.append(mk('ptask','pipTask'),Object.assign(mk('clk','pipClk'),{textContent:'00:00'}),mk('tg','pipTg'));
+  syncPiP(); updateClock();
+  pipWin.addEventListener('pagehide',()=>{pipWin=null;});
+}
+function syncPiP(){
+  if(!pipWin||pipWin.closed)return;
+  const x=state.tasks.find(t=>t.id===timerTaskId), d=pipWin.document;
+  const t=d.getElementById('pipTask'), g=d.getElementById('pipTg');
+  if(t)t.textContent=x?x.title:'';
+  if(g)g.textContent='target ~'+fmtMin(Math.round(timerTarget/60)||25);
+}
 
 /* ===================== mutations ===================== */
 function completeTask(id,silent,suggested){
@@ -718,6 +751,7 @@ document.getElementById('focusCard').addEventListener('click',e=>{
   else if(act==='fdone'){stopTimer();const sug=Math.round(timerElapsed/60);closeFocus();completeTask(timerTaskId,false,sug);render();}
   else if(act==='fpark'){const cur=state.tasks.find(t=>t.id===timerTaskId);if(cur&&cur.status==='progress')cur.status='next';closeFocus();openPick();}
   else if(act==='fcheck'){completeTask(el.dataset.id,true);render();openFocus(timerTaskId);}
+  else if(act==='pip'){openPiP();}
 });
 document.getElementById('overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeFocus();});
 document.getElementById('logCard').addEventListener('click',e=>{
@@ -787,7 +821,7 @@ function showConnect(){
   document.getElementById('repoInput').value=GH.repo;
   document.getElementById('branchInput').value=GH.branch;
   const se=lsGet(EXP_KEY);
-  document.getElementById('expInput').value=se?isoDay(Date.parse(se)):isoDay(Date.now()+90*864e5);
+  document.getElementById('expInput').value=se?isoDay(Date.parse(se)):isoDay(Date.now()+30*864e5);
   setSync('idle');
 }
 function hideConnect(){document.getElementById('connectOverlay').classList.remove('on');document.getElementById('mainUI').classList.remove('hidden');}
