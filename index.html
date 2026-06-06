@@ -128,6 +128,8 @@ body{
 .chip.est{color:#cdd5e3}
 .chip.dom{font-family:var(--body);font-weight:600;font-size:11px;color:var(--muted)}
 .chip.dom:hover{color:var(--txt);border-color:var(--accent)}
+.chip.focus{font-family:var(--body);font-weight:600;font-size:11px;color:var(--accent);border-color:rgba(110,168,255,.4);cursor:pointer}
+.chip.focus:hover{background:rgba(110,168,255,.12);border-color:var(--accent)}
 .chip.mv{padding:2px 7px;color:var(--muted-2)}
 .chip.mv:hover{color:var(--accent);border-color:#3a4556}
 .chip.del{color:var(--muted-2)}
@@ -281,7 +283,7 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
     <div class="legend" id="legend"></div>
   </div>
 
-  <div class="foot">Tempo &middot; synced to your private GitHub repo &middot; <b style="color:var(--accent)">build v6.2</b></div>
+  <div class="foot">Tempo &middot; synced to your private GitHub repo &middot; <b style="color:var(--accent)">build v6.3</b></div>
 </div>
 
 <div class="overlay" id="overlay"><div class="focus" id="focusCard"></div></div>
@@ -544,6 +546,7 @@ function taskHTML(x,isSub){
   const isOpen=state.ui.open[x.id]||(FOCUSMODE&&hasProgressDescendant(x));
   const dimmed=isSub&&x.status!=='progress'&&!hasProgressDescendant(x);
   let meta='';
+  if(!x.ref&&!isDone)meta+='<span class="chip focus" data-act="focus" data-id="'+x.id+'" title="Open the focus timer for this task">&#9654; Focus</span>';
   if(prog)meta+='<span class="progwrap"><span class="ring" style="--p:'+prog.pct+'"></span><span class="subcount">'+prog.done+'/'+prog.total+' done</span></span>';
   if(!isDone){
     const hasRealKids=kid.filter(c=>!c.ref).length>0;
@@ -737,6 +740,7 @@ board.addEventListener('click',e=>{
   else if(act==='down'){moveTask(id,1);render();}
   else if(act==='del'){deleteTask(id);}
   else if(act==='domain'){cycleDomain(id);render();}
+  else if(act==='focus'){openFocus(id);}
   else if(act==='edit-resume'){editingResume=id;render();const i=document.querySelector('[data-resumeedit="'+id+'"]');if(i){i.focus();try{i.setSelectionRange(i.value.length,i.value.length);}catch(e){}}}
 });
 board.addEventListener('change',e=>{const el=e.target.closest('[data-act="status"]');if(el){setStatus(el.dataset.id,el.value);render();}});
