@@ -293,7 +293,7 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
     <div class="legend" id="legend"></div>
   </div>
 
-  <div class="foot">Tempo &middot; synced to your private GitHub repo &middot; <b style="color:var(--accent)">build v6.5</b></div>
+  <div class="foot">Tempo &middot; synced to your private GitHub repo &middot; <b style="color:var(--accent)">build v6.6</b></div>
 </div>
 
 <div class="overlay" id="overlay"><div class="focus" id="focusCard"></div></div>
@@ -688,7 +688,7 @@ function updateClock(){
   if(checkpointMin>0&&timerInt){const n=Math.floor(tot/(checkpointMin*60));if(n>ckCount&&n>0){ckCount=n;playChime();toast('\ud83d\udd14 Checkpoint \u2014 flowing or fighting? In it \u2192 bump the interval up. Drifted \u2192 back to the one thing.');}}
   const x=state.tasks.find(t=>t.id===timerTaskId);
   if(timerInt)document.title=(over?'\ud83d\udd34 ':'\u23f1\ufe0f ')+txt+(x?' \u00b7 '+x.title:'')+' \u2014 '+BASE_TITLE;
-  if(pipWin&&!pipWin.closed){const pe=pipWin.document.getElementById('pipClk'); if(pe){pe.textContent=txt;pe.classList.toggle('over',over);}}
+  if(pipWin&&!pipWin.closed){const pd=pipWin.document;const pe=pd.getElementById('pipClk');if(pe){pe.textContent=txt;pe.classList.toggle('over',over);}const pw=pd.getElementById('pipWedge');if(pw)pw.setAttribute('d',wedgePath(66,66,58,frac));const pr=pd.getElementById('pipRing');if(pr)pr.setAttribute('stroke',over?'#f5933b':'#2a3342');}
 }
 function toggleTimer(btn){
   if(timerInt){stopTimer();if(btn)btn.innerHTML='&#9654; Resume';const x=state.tasks.find(t=>t.id===timerTaskId);document.title='\u23f8\ufe0f '+(x?x.title+' \u2014 ':'')+BASE_TITLE;}
@@ -698,13 +698,12 @@ function stopTimer(){if(timerInt){timerElapsed+=Math.floor((Date.now()-timerStar
 async function openPiP(){
   if(!PIP_OK){toast('Floating timer needs Chrome or Edge \u2014 the tab-title timer still works everywhere.');return;}
   if(pipWin&&!pipWin.closed){try{pipWin.focus();}catch(e){}return;}
-  try{pipWin=await documentPictureInPicture.requestWindow({width:240,height:148});}
+  try{pipWin=await documentPictureInPicture.requestWindow({width:220,height:210});}
   catch(e){toast('Couldn\u2019t open the floating window.');return;}
   const d=pipWin.document, st=d.createElement('style');
-  st.textContent='*{box-sizing:border-box}body{margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:#0f1319;color:#e8edf5;font-family:system-ui,sans-serif;-webkit-user-select:none;user-select:none}.ptask{font-size:12px;color:#9fb0c3;max-width:92%;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.clk{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:42px;font-weight:700;line-height:1;letter-spacing:1px}.clk.over{color:#f15b5b}.tg{font-size:11px;color:#6b7a8d}';
+  st.textContent='*{box-sizing:border-box}body{margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:#0f1319;color:#e8edf5;font-family:system-ui,sans-serif;-webkit-user-select:none;user-select:none}.ptask{font-size:12px;color:#9fb0c3;max-width:92%;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ttd{position:relative;width:120px;height:120px}.ttd svg{display:block}.clk{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:27px;font-weight:700;letter-spacing:1px}.clk.over{color:#f5933b}';
   d.head.appendChild(st);
-  const mk=(c,id)=>{const e=d.createElement('div');e.className=c;e.id=id;return e;};
-  d.body.append(mk('ptask','pipTask'),Object.assign(mk('clk','pipClk'),{textContent:'00:00'}),mk('tg','pipTg'));
+  d.body.innerHTML='<div class="ptask" id="pipTask"></div><div class="ttd"><svg viewBox="0 0 132 132" width="120" height="120"><circle cx="66" cy="66" r="58" fill="#1b2230"></circle><path id="pipWedge" fill="#6ea8ff"></path><circle id="pipRing" cx="66" cy="66" r="58" fill="none" stroke="#2a3342" stroke-width="2.5"></circle></svg><div class="clk" id="pipClk">00:00</div></div>';
   syncPiP(); updateClock();
   pipWin.addEventListener('pagehide',()=>{pipWin=null;});
 }
