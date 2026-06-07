@@ -1,0 +1,8 @@
+{
+  "tasks": [
+    {"id":"welcome","title":"This is Tempo. Add your first task with + Task — or check this one off to watch the confetti. 🎉","status":"next","est":5,"parentId":null,"url":null,"pinned":true,"firstStep":"Hit + Task up top and type literally anything. 2 min.","resumeLine":"","actualMinutes":null,"domain":"work","ref":false,"createdAt":1717000000000,"completedAt":null}
+  ],
+  "parked": [],
+  "meta": {"doneDate":"2024-1-1","doneToday":0},
+  "ui": {"collapsed":{"done":true,"idea":true},"open":{}}
+}

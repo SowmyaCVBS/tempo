@@ -293,7 +293,7 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
     <div class="legend" id="legend"></div>
   </div>
 
-  <div class="foot">Tempo &middot; synced to your private GitHub repo &middot; <b style="color:var(--accent)">build v6.6</b></div>
+  <div class="foot">Tempo &middot; one thing at a time &middot; <b style="color:var(--accent)">build v7</b></div>
 </div>
 
 <div class="overlay" id="overlay"><div class="focus" id="focusCard"></div></div>
@@ -301,6 +301,18 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
 <div class="overlay" id="wrapOverlay"><div class="focus" id="wrapCard"></div></div>
 
 <!-- connect overlay -->
+<input type="file" id="importInput" accept="application/json,.json" style="display:none">
+<div class="overlay" id="chooserOverlay">
+  <div class="connect" style="max-width:460px;text-align:center">
+    <div class="kicker">&#128075; welcome to Tempo</div>
+    <h2>How do you want to use it?</h2>
+    <p class="lede">Pick one &mdash; you can switch anytime from the sync menu.</p>
+    <button class="btn primary" id="chooseLocal" style="width:100%;justify-content:center;margin-bottom:8px">&#128187; Use on this device</button>
+    <p class="note" style="margin:0 0 16px">Saved right in this browser &mdash; no account, nothing to set up. Add a backup file or download a copy so clearing your browser can't wipe it.</p>
+    <button class="btn ghost" id="chooseGithub" style="width:100%;justify-content:center">&#128279; Sync across my devices</button>
+    <p class="note" style="margin:6px 0 0">Uses a private GitHub repo + token. Syncs everywhere automatically &mdash; best if you're comfortable with GitHub.</p>
+  </div>
+</div>
 <div class="overlay" id="connectOverlay">
   <div class="connect">
     <div class="kicker">&#128274; Connect your board</div>
@@ -325,9 +337,10 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
 
     <div class="cerr" id="connectErr"></div>
     <button class="btn primary" id="connectBtn" style="width:100%;justify-content:center">&#128279; Connect</button>
+    <p class="note" style="text-align:center;margin:10px 0 0">Not into the setup? <a href="#" id="backToLocal" style="color:var(--accent)">Just use it on this device</a> instead.</p>
 
     <ol class="steps-list">
-      <li>Create a <b>private</b> repo named <b>tempo-data</b>, and upload the <b>board.json</b> I gave you into it.</li>
+      <li>Create a <b>private</b> repo named <b>tempo-data</b>, then <a href="#" id="dlStarter">download a starter <b>board.json</b></a> and upload it there.</li>
       <li>Make a fine-grained token here: <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a></li>
       <li>Repository access &rarr; <b>Only select repositories</b> &rarr; pick <b>tempo-data</b>.</li>
       <li>Permissions &rarr; Repository &rarr; <b>Contents</b> &rarr; <b>Read and write</b>. (That's the only one.)</li>
@@ -347,6 +360,8 @@ function lsDel(k){try{localStorage.removeItem(k);}catch(e){}}
 
 const TOKEN_KEY='tempo-gh-token';
 const EXP_KEY='tempo-gh-exp';
+const MODE_KEY='tempo-mode';
+const BOARD_KEY='tempo-board';
 const GH={
   owner: lsGet('tempo-gh-owner') || 'SowmyaCVBS',
   repo:  lsGet('tempo-gh-repo')  || 'tempo-data',
@@ -356,6 +371,7 @@ const GH={
 
 let token=null, state=null, remoteSha=null, dirty=false, saving=false, pollTimer=null;
 let tokenExpiry=null, authFailed=false;
+let mode=lsGet(MODE_KEY)||null, fileHandle=null, fileName='', needFsReconnect=false, fileTimer=null;
 function isoDay(ms){const d=new Date(ms);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function tokenDaysLeft(){if(!tokenExpiry)return null;return Math.ceil((tokenExpiry-Date.now())/86400000);}
 
@@ -457,13 +473,22 @@ async function ghPut(jsonStr,sha){
 function setSync(stt){
   const pill=document.getElementById('syncPill'),txt=document.getElementById('syncTxt');
   pill.classList.remove('ok','busy','bad');
-  const map={saved:['ok','Synced'],saving:['busy','Saving\u2026'],syncing:['busy','Syncing\u2026'],offline:['bad','Offline'],autherr:['bad','Reconnect'],idle:['','\u2026']};
+  const map={saved:['ok','Synced'],saving:['busy','Saving\u2026'],syncing:['busy','Syncing\u2026'],offline:['bad','Offline'],autherr:['bad','Reconnect'],local:['ok','On this device'],localfile:['ok','Saved \u00b7 file'],idle:['','\u2026']};
   const m=map[stt]||map.idle; if(m[0])pill.classList.add(m[0]); txt.textContent=m[1];
   if(stt==='autherr')authFailed=true; else if(stt==='saved')authFailed=false;
   updateBanner();
 }
 function updateBanner(){
   const el=document.getElementById('expBanner'); if(!el)return;
+  if(mode==='local'){
+    let lk=null,lm='',lact=null,lbtn='';
+    if(needFsReconnect){lk='warn';lm='<b>Reconnect your backup file</b> so changes keep saving to it.';lact=reconnectFile;lbtn='Reconnect';}
+    else if(!fileHandle){lk='warn';lm='<b>Saved on this device only.</b> Add a backup file (Chrome/Edge) or download a copy, so clearing your browser can\u2019t wipe your list.';lact=pickSaveFile;lbtn='Set up backup';}
+    if(!lk){el.style.display='none';return;}
+    el.className='expbanner '+lk;
+    el.innerHTML='<span class="ebmsg">\u23f3 '+lm+'</span><button class="btn sm" id="ebFix">'+lbtn+'</button>';
+    el.style.display='flex'; document.getElementById('ebFix').onclick=lact; return;
+  }
   if(!token){el.style.display='none';return;}
   const d=tokenDaysLeft(); let kind=null,msg='';
   if(authFailed||(d!==null&&d<=0)){
@@ -489,7 +514,27 @@ async function pull(){
   }catch(e){setSync(e&&e.auth?'autherr':'offline');return false;}
 }
 let saveTimer=null;
-function scheduleSave(){dirty=true;setSync('saving');clearTimeout(saveTimer);saveTimer=setTimeout(commit,600);}
+function serializeStr(){return JSON.stringify(serialize(state),null,1);}
+function persistLocal(){lsSet(BOARD_KEY,serializeStr());}
+function scheduleSave(){
+  dirty=true;
+  if(mode==='local'){persistLocal();if(fileHandle){clearTimeout(fileTimer);fileTimer=setTimeout(writeFile,800);}setSync(fileHandle?'localfile':'local');dirty=false;return;}
+  setSync('saving');clearTimeout(saveTimer);saveTimer=setTimeout(commit,600);
+}
+/* ---- local mode: file autosave + backups (gated on mode==='local') ---- */
+const FS_OK=('showSaveFilePicker' in window);
+function idbHandle(method,val){return new Promise(res=>{try{const r=indexedDB.open('tempo-fs',1);r.onupgradeneeded=()=>r.result.createObjectStore('h');r.onerror=()=>res(null);r.onsuccess=()=>{try{const tx=r.result.transaction('h','readwrite'),st=tx.objectStore('h');const op=method==='get'?st.get('boardFile'):method==='del'?st.delete('boardFile'):st.put(val,'boardFile');op.onsuccess=()=>res(method==='get'?op.result:true);op.onerror=()=>res(null);}catch(e){res(null);}};}catch(e){res(null);}});}
+async function verifyPermission(h,doPrompt){try{const o={mode:'readwrite'};if((await h.queryPermission(o))==='granted')return true;if(doPrompt&&(await h.requestPermission(o))==='granted')return true;}catch(e){}return false;}
+async function writeFile(){if(!fileHandle)return;try{const w=await fileHandle.createWritable();await w.write(serializeStr());await w.close();needFsReconnect=false;}catch(e){needFsReconnect=true;updateBanner();}}
+async function pickSaveFile(){if(!FS_OK){toast('Auto-save to a file needs Chrome or Edge \u2014 use Download a backup instead.');return;}try{fileHandle=await window.showSaveFilePicker({suggestedName:'tempo-board.json',types:[{description:'Tempo board',accept:{'application/json':['.json']}}]});fileName=fileHandle.name;needFsReconnect=false;await writeFile();await idbHandle('put',fileHandle);toast('Auto-saving to <b>'+escapeHtml(fileName)+'</b>. Keep it in your Google Drive or Dropbox folder for cloud backup.');setSync('localfile');updateBanner();}catch(e){}}
+async function pickOpenFile(){if(!FS_OK){document.getElementById('importInput').click();return;}try{const picked=await window.showOpenFilePicker({types:[{description:'Tempo board',accept:{'application/json':['.json']}}]});const h=picked[0];const f=await h.getFile();state=normalize(JSON.parse(await f.text()));fileHandle=h;fileName=h.name;needFsReconnect=false;await idbHandle('put',h);persistLocal();render();toast('Loaded from <b>'+escapeHtml(fileName)+'</b> \u2014 now auto-saving here.');updateBanner();}catch(e){}}
+async function reconnectFile(){try{const h=await idbHandle('get');if(!h){needFsReconnect=false;updateBanner();return;}if(await verifyPermission(h,true)){fileHandle=h;fileName=h.name;needFsReconnect=false;await writeFile();render();toast('Backup file reconnected. \ud83d\udcbe');}}catch(e){}}
+function downloadBackup(){try{const blob=new Blob([serializeStr()],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='tempo-board-'+isoDay(Date.now())+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);toast('Backup downloaded.');}catch(e){}}
+function downloadStarter(){try{const blob=new Blob([JSON.stringify(emptySeed(),null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='board.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);toast('Starter board.json downloaded \u2014 upload it to your tempo-data repo.');}catch(e){}}
+function importBackup(file){const r=new FileReader();r.onload=()=>{try{state=normalize(JSON.parse(r.result));persistLocal();render();toast('Board loaded from your backup.');}catch(e){toast('That file didn\u2019t look like a Tempo board.');}};r.readAsText(file);}
+function startLocal(){mode='local';lsSet(MODE_KEY,'local');const saved=lsGet(BOARD_KEY);if(saved){try{state=normalize(JSON.parse(saved));}catch(e){state=emptySeed();}}else state=emptySeed();hideChooser();hideConnect();render();setSync(fileHandle?'localfile':'local');updateBanner();}
+function showChooser(){document.getElementById('chooserOverlay').classList.add('on');document.getElementById('mainUI').classList.add('hidden');}
+function hideChooser(){document.getElementById('chooserOverlay').classList.remove('on');}
 async function commit(initial){
   if(!token||saving)return;
   saving=true;setSync('saving');
@@ -852,12 +897,26 @@ document.getElementById('dfilter').addEventListener('click',e=>{const p=e.target
 function syncTabs(){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.view===view));}
 
 /* sync menu */
-document.getElementById('syncPill').addEventListener('click',()=>{document.getElementById('syncMenu').classList.toggle('on');});
+function renderMenu(){
+  const m=document.getElementById('syncMenu');
+  if(mode==='local'){
+    m.innerHTML=(fileHandle?'<button data-m="filesave">&#128196; Backup: '+escapeHtml(fileName)+' (change\u2026)</button>':'<button data-m="filesave">&#128190; Auto-save to a file\u2026</button>')+'<button data-m="fileopen">&#128194; Open a board file\u2026</button><div class="sep"></div><button data-m="backup">&#11015; Download a backup</button><button data-m="restore">&#11014; Load a backup\u2026</button><div class="sep"></div><button data-m="togithub">&#128279; Switch to GitHub sync</button>';
+  }else{
+    m.innerHTML='<button data-m="refresh">&#8635; Refresh now</button><button data-m="backup">&#11015; Download a backup</button><div class="sep"></div><button data-m="disconnect" class="danger">&#9210; Disconnect this browser</button>';
+  }
+}
+document.getElementById('syncPill').addEventListener('click',()=>{renderMenu();document.getElementById('syncMenu').classList.toggle('on');});
 document.getElementById('syncMenu').addEventListener('click',async e=>{
   const b=e.target.closest('[data-m]');if(!b)return;
   document.getElementById('syncMenu').classList.remove('on');
-  if(b.dataset.m==='refresh'){const ok=await pull();if(ok)render();}
-  else if(b.dataset.m==='disconnect')disconnect();
+  const a=b.dataset.m;
+  if(a==='refresh'){const ok=await pull();if(ok)render();}
+  else if(a==='disconnect')disconnect();
+  else if(a==='filesave')pickSaveFile();
+  else if(a==='fileopen')pickOpenFile();
+  else if(a==='backup')downloadBackup();
+  else if(a==='restore')document.getElementById('importInput').click();
+  else if(a==='togithub'){mode='github';lsSet(MODE_KEY,'github');showConnect();}
 });
 document.addEventListener('click',e=>{if(!e.target.closest('.syncwrap'))document.getElementById('syncMenu').classList.remove('on');});
 
@@ -893,6 +952,11 @@ async function doConnect(){
 function disconnect(){lsDel(TOKEN_KEY);lsDel(EXP_KEY);token=null;tokenExpiry=null;authFailed=false;remoteSha=null;state=null;clearInterval(pollTimer);document.getElementById('tokenInput').value='';updateBanner();showConnect();toast('Disconnected. Token wiped from this browser.');}
 document.getElementById('connectBtn').addEventListener('click',doConnect);
 document.getElementById('tokenInput').addEventListener('keydown',e=>{if(e.key==='Enter')doConnect();});
+document.getElementById('chooseLocal').addEventListener('click',startLocal);
+document.getElementById('chooseGithub').addEventListener('click',()=>{mode='github';lsSet(MODE_KEY,'github');hideChooser();showConnect();});
+document.getElementById('importInput').addEventListener('change',e=>{if(e.target.files[0])importBackup(e.target.files[0]);e.target.value='';});
+document.getElementById('backToLocal').addEventListener('click',e=>{e.preventDefault();document.getElementById('connectOverlay').classList.remove('on');startLocal();});
+document.getElementById('dlStarter').addEventListener('click',e=>{e.preventDefault();downloadStarter();});
 
 /* ===================== fx ===================== */
 function toast(html){const el=document.getElementById('toast');el.innerHTML=html;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2800);}
@@ -927,11 +991,24 @@ document.getElementById('legend').innerHTML=SECTION_ORDER.map(s=>'<span><span cl
 (async function(){
   token=lsGet(TOKEN_KEY);
   const se=lsGet(EXP_KEY); if(se){const t=Date.parse(se); if(!isNaN(t))tokenExpiry=t;}
-  if(!token){showConnect();return;}
-  const ok=await pull();
-  if(ok){hideConnect();render();startPolling();}
-  else{showConnect();document.getElementById('connectErr').textContent='Saved token didn\u2019t work \u2014 it may have expired. Paste a fresh one.';}
-  updateBanner();
+  if(mode==='local'){
+    let h=null; try{h=await idbHandle('get');}catch(e){}
+    if(h){ if(await verifyPermission(h,false)){fileHandle=h;fileName=h.name;} else needFsReconnect=true; }
+    let loaded=false; const saved=lsGet(BOARD_KEY);
+    if(saved){try{state=normalize(JSON.parse(saved));loaded=true;}catch(e){}}
+    if(!loaded&&fileHandle){try{const f=await fileHandle.getFile();state=normalize(JSON.parse(await f.text()));persistLocal();loaded=true;}catch(e){}}
+    if(!loaded)state=emptySeed();
+    hideConnect();render();setSync(fileHandle?'localfile':'local');updateBanner();return;
+  }
+  if(token){
+    mode='github';lsSet(MODE_KEY,'github');
+    const ok=await pull();
+    if(ok){hideConnect();render();startPolling();}
+    else{showConnect();document.getElementById('connectErr').textContent='Saved token didn\u2019t work \u2014 it may have expired. Paste a fresh one.';}
+    updateBanner();return;
+  }
+  if(mode==='github'){showConnect();return;}
+  showChooser();
 })();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&token&&!dirty&&!saving&&!userIsTyping()){pull().then(ok=>{if(ok)render();});}});
 </script>
