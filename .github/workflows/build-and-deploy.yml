@@ -1,0 +1,46 @@
+# .github/workflows/build-and-deploy.yml
+# Gate: index.html must parse before it deploys to GitHub Pages.
+# Requires Pages source = "GitHub Actions" (Settings > Pages > Build and deployment).
+name: build-and-deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+# Least privilege: read the repo; write only what Pages deploy needs.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; newer push supersedes an in-flight one.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Parse-check index.html (blocks deploy on failure)
+        run: node scripts/check-build.js index.html
+
+  deploy:
+    needs: check          # deploy only runs if the parse-check passed
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .          # repo root is the site (index.html at root)
+      - id: deploy
+        uses: actions/deploy-pages@v4
