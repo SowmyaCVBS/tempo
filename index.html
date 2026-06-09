@@ -125,11 +125,13 @@ body{
 .tmeta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:7px}
 .chip{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--panel-2);border:1px solid var(--line-soft);padding:2px 8px;border-radius:7px;cursor:pointer;transition:.12s}
 .chip:hover{border-color:#3a4556;color:var(--txt)}
-.chip.est{color:#cdd5e3}
+.chip.est{color:var(--muted);background:none;border-color:transparent;padding-left:2px}
+.chip.del,.chip.mv{opacity:.4}
+.task:hover .chip.del,.task:hover .chip.mv,.task:focus-within .chip.del,.task:focus-within .chip.mv{opacity:1}
 .chip.dom{font-family:var(--body);font-weight:600;font-size:11px;color:var(--muted)}
 .chip.dom:hover{color:var(--txt);border-color:var(--accent)}
-.chip.focus{font-family:var(--body);font-weight:600;font-size:11px;color:var(--accent);border-color:rgba(110,168,255,.4);cursor:pointer}
-.chip.focus:hover{background:rgba(110,168,255,.12);border-color:var(--accent)}
+.chip.gofocus{margin-left:auto;font-size:13px;line-height:1;color:var(--muted-2);background:none;border-color:transparent;padding:3px 8px;cursor:pointer}
+.chip.gofocus:hover{color:var(--accent);background:rgba(110,168,255,.12)}
 .chip.mv{padding:2px 7px;color:var(--muted-2)}
 .chip.mv:hover{color:var(--accent);border-color:#3a4556}
 .chip.del{color:var(--muted-2)}
@@ -308,7 +310,8 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
     <h2>How do you want to use it?</h2>
     <p class="lede">Pick one &mdash; you can switch anytime from the sync menu.</p>
     <button class="btn primary" id="chooseLocal" style="width:100%;justify-content:center;margin-bottom:8px">&#128187; Use on this device</button>
-    <p class="note" style="margin:0 0 16px">Saved right in this browser &mdash; no account, nothing to set up. Add a backup file or download a copy so clearing your browser can't wipe it.</p>
+    <p class="note" style="margin:0 0 6px">Saved right in this browser &mdash; no account, nothing to set up. Add a backup file or download a copy so clearing your browser can't wipe it.</p>
+    <p class="note" style="margin:0 0 16px"><a href="#" id="chooserRestore" style="color:var(--accent)">&#11014; Coming back, or on a new device? Load a saved board file</a></p>
     <button class="btn ghost" id="chooseGithub" style="width:100%;justify-content:center">&#128279; Sync across my devices</button>
     <p class="note" style="margin:6px 0 0">Uses a private GitHub repo + token. Syncs everywhere automatically &mdash; best if you're comfortable with GitHub.</p>
   </div>
@@ -527,11 +530,12 @@ function idbHandle(method,val){return new Promise(res=>{try{const r=indexedDB.op
 async function verifyPermission(h,doPrompt){try{const o={mode:'readwrite'};if((await h.queryPermission(o))==='granted')return true;if(doPrompt&&(await h.requestPermission(o))==='granted')return true;}catch(e){}return false;}
 async function writeFile(){if(!fileHandle)return;try{const w=await fileHandle.createWritable();await w.write(serializeStr());await w.close();needFsReconnect=false;}catch(e){needFsReconnect=true;updateBanner();}}
 async function pickSaveFile(){if(!FS_OK){toast('Auto-save to a file needs Chrome or Edge \u2014 use Download a backup instead.');return;}try{fileHandle=await window.showSaveFilePicker({suggestedName:'tempo-board.json',types:[{description:'Tempo board',accept:{'application/json':['.json']}}]});fileName=fileHandle.name;needFsReconnect=false;await writeFile();await idbHandle('put',fileHandle);toast('Auto-saving to <b>'+escapeHtml(fileName)+'</b>. Keep it in your Google Drive or Dropbox folder for cloud backup.');setSync('localfile');updateBanner();}catch(e){}}
-async function pickOpenFile(){if(!FS_OK){document.getElementById('importInput').click();return;}try{const picked=await window.showOpenFilePicker({types:[{description:'Tempo board',accept:{'application/json':['.json']}}]});const h=picked[0];const f=await h.getFile();state=normalize(JSON.parse(await f.text()));fileHandle=h;fileName=h.name;needFsReconnect=false;await idbHandle('put',h);persistLocal();render();toast('Loaded from <b>'+escapeHtml(fileName)+'</b> \u2014 now auto-saving here.');updateBanner();}catch(e){}}
+async function pickOpenFile(){if(!FS_OK){document.getElementById('importInput').click();return;}try{const picked=await window.showOpenFilePicker({types:[{description:'Tempo board',accept:{'application/json':['.json']}}]});const h=picked[0];const f=await h.getFile();state=normalize(JSON.parse(await f.text()));fileHandle=h;fileName=h.name;needFsReconnect=false;enterLocalUI();await idbHandle('put',h);persistLocal();render();setSync('localfile');toast('Loaded from <b>'+escapeHtml(fileName)+'</b> \u2014 now auto-saving here.');updateBanner();}catch(e){}}
 async function reconnectFile(){try{const h=await idbHandle('get');if(!h){needFsReconnect=false;updateBanner();return;}if(await verifyPermission(h,true)){fileHandle=h;fileName=h.name;needFsReconnect=false;await writeFile();render();toast('Backup file reconnected. \ud83d\udcbe');}}catch(e){}}
 function downloadBackup(){try{const blob=new Blob([serializeStr()],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='tempo-board-'+isoDay(Date.now())+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);toast('Backup downloaded.');}catch(e){}}
 function downloadStarter(){try{const blob=new Blob([JSON.stringify(emptySeed(),null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='board.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);toast('Starter board.json downloaded \u2014 upload it to your tempo-data repo.');}catch(e){}}
-function importBackup(file){const r=new FileReader();r.onload=()=>{try{state=normalize(JSON.parse(r.result));persistLocal();render();toast('Board loaded from your backup.');}catch(e){toast('That file didn\u2019t look like a Tempo board.');}};r.readAsText(file);}
+function importBackup(file){const r=new FileReader();r.onload=()=>{try{state=normalize(JSON.parse(r.result));enterLocalUI();persistLocal();render();setSync(fileHandle?'localfile':'local');updateBanner();toast('Board loaded from your backup.');}catch(e){toast('That file didn\u2019t look like a Tempo board.');}};r.readAsText(file);}
+function enterLocalUI(){mode='local';lsSet(MODE_KEY,'local');hideChooser();hideConnect();}
 function startLocal(){mode='local';lsSet(MODE_KEY,'local');const saved=lsGet(BOARD_KEY);if(saved){try{state=normalize(JSON.parse(saved));}catch(e){state=emptySeed();}}else state=emptySeed();hideChooser();hideConnect();render();setSync(fileHandle?'localfile':'local');updateBanner();}
 function showChooser(){document.getElementById('chooserOverlay').classList.add('on');document.getElementById('mainUI').classList.add('hidden');}
 function hideChooser(){document.getElementById('chooserOverlay').classList.remove('on');}
@@ -601,7 +605,6 @@ function taskHTML(x,isSub){
   const isOpen=state.ui.open[x.id]||(FOCUSMODE&&hasProgressDescendant(x));
   const dimmed=isSub&&x.status!=='progress'&&!hasProgressDescendant(x);
   let meta='';
-  if(!x.ref&&!isDone)meta+='<span class="chip focus" data-act="focus" data-id="'+x.id+'" title="Open the focus timer for this task">&#9654; Focus</span>';
   if(prog)meta+='<span class="progwrap"><span class="ring" style="--p:'+prog.pct+'"></span><span class="subcount">'+prog.done+'/'+prog.total+' done</span></span>';
   if(!isDone){
     const hasRealKids=kid.filter(c=>!c.ref).length>0;
@@ -620,6 +623,7 @@ function taskHTML(x,isSub){
   if(!x.ref&&!isDone&&x.parentId===null)meta+='<span class="chip dom" data-act="domain" data-id="'+x.id+'" title="Life area \u2014 click to cycle Work / Fun / Growth">'+DOMAINS[x.domain]+'</span>';
   if(isSub)meta+='<span class="chip mv" data-act="up" data-id="'+x.id+'" title="Move up">&#9650;</span><span class="chip mv" data-act="down" data-id="'+x.id+'" title="Move down">&#9660;</span>';
   if(!x.ref)meta+='<span class="chip del" data-act="del" data-id="'+x.id+'" title="Delete this task">&#128465;</span>';
+  if(!x.ref&&!isDone)meta+='<span class="chip gofocus" data-act="focus" data-id="'+x.id+'" title="Focus this &mdash; start the timer">&#9654;</span>';
   let resumeBlock='';
   if(x.status==='progress'&&!x.ref){
     if(editingResume===x.id)resumeBlock='<div class="resume editing"><input class="resume-input" data-resumeedit="'+x.id+'" value="'+escapeHtml(x.resumeLine||'')+'" placeholder="next physical action \u2014 the exact thing to do first"></div>';
@@ -953,6 +957,7 @@ function disconnect(){lsDel(TOKEN_KEY);lsDel(EXP_KEY);token=null;tokenExpiry=nul
 document.getElementById('connectBtn').addEventListener('click',doConnect);
 document.getElementById('tokenInput').addEventListener('keydown',e=>{if(e.key==='Enter')doConnect();});
 document.getElementById('chooseLocal').addEventListener('click',startLocal);
+document.getElementById('chooserRestore').addEventListener('click',e=>{e.preventDefault();pickOpenFile();});
 document.getElementById('chooseGithub').addEventListener('click',()=>{mode='github';lsSet(MODE_KEY,'github');hideChooser();showConnect();});
 document.getElementById('importInput').addEventListener('change',e=>{if(e.target.files[0])importBackup(e.target.files[0]);e.target.value='';});
 document.getElementById('backToLocal').addEventListener('click',e=>{e.preventDefault();document.getElementById('connectOverlay').classList.remove('on');startLocal();});
