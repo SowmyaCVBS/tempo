@@ -175,6 +175,20 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
 .parked-card .pt{flex:1;font-size:13.5px;min-width:160px}
 .parked-card .when{font-family:var(--mono);font-size:10.5px;color:var(--muted-2)}
 
+.fone{background:linear-gradient(180deg,#121a26,#0d121b);border:1px solid #3a557e;border-radius:18px;padding:24px 26px;box-shadow:var(--shadow);animation:rise .4s ease both}
+.fkick{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;color:var(--accent);text-transform:uppercase;margin-bottom:10px}
+.ftitle{font-family:var(--disp);font-weight:800;font-size:21px;letter-spacing:-.3px;line-height:1.25;margin-bottom:10px}
+.fprog{display:flex;align-items:center;gap:12px;margin:16px 0 10px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.fbar{flex:1;height:7px;border-radius:99px;background:var(--panel-2);overflow:hidden}
+.fbar i{display:block;height:100%;background:linear-gradient(90deg,var(--green),#5fe0a0);border-radius:99px;transition:width .3s}
+.fsub{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;border:1px solid transparent;color:var(--muted)}
+.fsub.on{background:rgba(110,168,255,.08);border-color:rgba(110,168,255,.35);color:var(--txt)}
+.fsub .fttl{flex:1;font-size:14px}
+.fsub .fest{font-family:var(--mono);font-size:11px;color:var(--muted-2)}
+.btn.xl{width:100%;justify-content:center;padding:14px;font-size:15.5px;margin-top:16px;border-radius:12px}
+.fmore{text-align:center;color:var(--muted-2);font-size:12.5px;margin-top:12px}
+.ritual{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:rgba(255,176,67,.07);border:1px solid rgba(255,176,67,.3);border-radius:12px;padding:11px 14px;font-size:13.5px;margin-bottom:12px;animation:rise .4s ease both}
+.ritual .rbtns{margin-left:auto;display:flex;gap:8px}
 .empty{text-align:center;padding:46px 20px;color:var(--muted)}
 .empty .big{font-family:var(--disp);font-weight:700;font-size:17px;color:var(--txt);margin-bottom:6px}
 .empty p{font-size:13.5px;max-width:360px;margin:0 auto 16px}
@@ -282,20 +296,12 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
       <button class="tab" data-view="parked">Parked <span class="c" id="cParked"></span></button>
     </div>
 
-    <div class="dfilter" id="dfilter">
-      <span class="dlabel">area</span>
-      <button class="dpill on" data-domain="all">All</button>
-      <button class="dpill" data-domain="work">Work</button>
-      <button class="dpill" data-domain="fun">Fun</button>
-      <button class="dpill" data-domain="growth">Growth</button>
-    </div>
-
     <div id="board"></div>
 
     <div class="legend" id="legend"></div>
   </div>
 
-  <div class="foot">Tempo &middot; one thing at a time &middot; <b style="color:var(--accent)">build v7</b></div>
+  <div class="foot">Tempo &middot; one thing at a time &middot; <b style="color:var(--accent)">build v8 &middot; frozen</b></div>
 </div>
 
 <div class="overlay" id="overlay"><div class="focus" id="focusCard"></div></div>
@@ -392,10 +398,8 @@ const SECTION_ORDER=['progress','next','lagging','help','team','idea','done'];
 const FOCUS_STATUSES=['progress'];
 const DOMAINS={work:'Work',fun:'Fun',growth:'Growth'};
 const DOMAIN_ORDER=['work','fun','growth'];
-let domainFilter='all';
-function domainOK(x){return domainFilter==='all'||x.domain===domainFilter;}
+function domainOK(x){return true;}
 function cycleDomain(id){const t=state.tasks.find(t=>t.id===id);if(!t)return;const i=DOMAIN_ORDER.indexOf(t.domain);t.domain=DOMAIN_ORDER[(i+1)%DOMAIN_ORDER.length];kids(t.id).forEach(c=>c.domain=t.domain);}
-function setDomainFilter(d){domainFilter=d;document.querySelectorAll('.dpill').forEach(p=>p.classList.toggle('on',p.dataset.domain===d));render();}
 
 /* ===================== empty starter (NO real data) ===================== */
 function emptySeed(){
@@ -646,23 +650,60 @@ function renderChildren(pid){
 }
 function hasProgressDescendant(x){return kids(x.id).some(c=>!c.ref&&(c.status==='progress'||hasProgressDescendant(c)));}
 function focusTops(){return state.tasks.filter(x=>!x.ref&&x.parentId===null&&domainOK(x)&&(x.status==='progress'||hasProgressDescendant(x)));}
+function topOf(x){while(x&&x.parentId){const p=state.tasks.find(t=>t.id===x.parentId);if(!p)break;x=p;}return x;}
+function ritualHTML(){
+  if((state.meta.ritualDay||'')===todayKey())return '';
+  const pin=state.tasks.find(t=>t.pinned&&!t.ref&&t.status!=='done');
+  if(pin)return '<div class="ritual">&#127749; New day. Still THE ONE: <b>'+escapeHtml(pin.title)+'</b>?<span class="rbtns"><button class="btn sm" data-act="ritual-keep">Yes &mdash; lock it</button><button class="btn sm ghost" data-act="ritual-pick">Pick another for me</button></span></div>';
+  return '<div class="ritual">&#127749; New day. Pick today&rsquo;s ONE before the inbox picks it for you.<span class="rbtns"><button class="btn sm" data-act="ritual-pick">&#127919; Pick one for me</button></span></div>';
+}
 function renderFocusView(){
   const items=focusTops();
+  const ritual=ritualHTML();
   if(!items.length){
-    board.innerHTML='<div class="empty"><div class="big">Nothing\u2019s "in progress."</div><p>That\u2019s not a problem \u2014 it\u2019s a decision waiting to happen. Don\u2019t agonize. Let me pick, and start the clock.</p><button class="btn primary" id="pickEmpty">&#127919; Pick one for me</button></div>';
+    board.innerHTML=ritual+'<div class="empty"><div class="big">Nothing\u2019s "in progress."</div><p>That\u2019s not a problem \u2014 it\u2019s a decision waiting to happen. Don\u2019t agonize. Let me pick, and start the clock.</p><button class="btn primary" id="pickEmpty">&#127919; Pick one for me</button></div>';
     document.getElementById('pickEmpty').onclick=openPick;return;
   }
-  FOCUSMODE=true;
-  const body=items.map(x=>taskHTML(x,false)).join('');
-  FOCUSMODE=false;
-  board.innerHTML='<div class="section"><div class="slist">'+body+'</div></div><div class="empty" style="padding:20px"><p style="margin:0">That\u2019s it. That\u2019s the whole list right now. Everything else is one tab away \u2014 but it\u2019s not this minute\u2019s problem.</p></div>';
+  const x=items.find(t=>t.pinned)||items[0];
+  const real=kids(x.id).filter(c=>!c.ref);
+  const pend=real.filter(c=>c.status!=='done');
+  const done=real.length-pend.length;
+  const active=pend.find(c=>c.status==='progress')||pend[0]||null;
+  const tgt=active||x;
+  let subs='';
+  if(real.length){
+    const pct=Math.round(done/real.length*100);
+    subs+='<div class="fprog"><div class="fbar"><i style="width:'+pct+'%"></i></div><span>'+done+' of '+real.length+' done \u00b7 '+pend.length+' to go</span></div>';
+    subs+=pend.map(c=>'<div class="fsub'+(active&&c.id===active.id?' on':'')+'"><div class="check" data-act="check" data-id="'+c.id+'" title="Mark done \u2014 it\u2019ll clear from here"></div><span class="fttl">'+escapeHtml(c.title)+'</span>'+(c.est?'<span class="fest">~'+fmtMin(c.est)+'</span>':'')+'</div>').join('');
+  }
+  let resume='';
+  if(editingResume===x.id)resume='<div class="resume editing"><input class="resume-input" data-resumeedit="'+x.id+'" value="'+escapeHtml(x.resumeLine||'')+'" placeholder="next physical action \u2014 the exact thing to do first"></div>';
+  else if(x.resumeLine)resume='<div class="resume" data-act="edit-resume" data-id="'+x.id+'" title="Click to edit your resume note">&#8592; '+escapeHtml(x.resumeLine)+'</div>';
+  else resume='<div class="resume muted" data-act="edit-resume" data-id="'+x.id+'">&#8592; add a resume note</div>';
+  const onramp=x.firstStep?'<div class="firststep"><b>Start here &middot; on-ramp</b>'+escapeHtml(x.firstStep)+'</div>':'';
+  const more=items.length>1?'<div class="fmore">'+(items.length-1)+' more in progress \u2014 they\u2019re in All.'+(items.length>3?' That\u2019s a lot of open loops; demote a couple before they demote you. \ud83d\ude05':'')+'</div>':'';
+  board.innerHTML=ritual+
+    '<div class="fone" data-id="'+x.id+'">'+
+      '<div class="fkick">'+(x.pinned?'&#128204; the one':'in progress')+'</div>'+
+      '<div class="ftitle"><span class="dot '+x.status+'" style="width:10px;height:10px;display:inline-block;margin-right:9px"></span>'+escapeHtml(x.title)+'</div>'+
+      resume+onramp+subs+
+      '<button class="btn primary xl" data-act="focus" data-id="'+tgt.id+'">&#9654;&nbsp;&nbsp;Start focus'+(active?' on: '+escapeHtml(active.title.length>46?active.title.slice(0,46)+'\u2026':active.title):'')+'</button>'+
+    '</div>'+more+
+    '<div class="empty" style="padding:16px"><p style="margin:0">One screen, one task \u2014 on purpose. Everything else lives in All.</p></div>';
 }
 function renderAllView(){
   let html='';
-  for(const s of SECTION_ORDER){
-    const tops=state.tasks.filter(x=>x.status===s&&x.parentId===null&&domainOK(x));if(!tops.length)continue;
-    const collapsed=state.ui.collapsed[s],totEst=tops.reduce((a,x)=>a+(rollupEst(x)||0),0);
-    html+='<div class="section '+(collapsed?'collapsed':'')+'" data-sec="'+s+'"><div class="shead" data-act="sec" data-sec="'+s+'"><span class="dot '+s+'"></span><h2>'+STATUS[s].label+'</h2><span class="cnt">'+tops.length+'</span>'+((totEst&&s!=='done')?'<span class="est">&#9201; ~'+fmtMin(totEst)+' total</span>':'<span class="est"></span>')+'<span class="car">&#9660;</span></div><div class="slist">'+tops.map(x=>taskHTML(x,false)).join('')+'</div></div>';
+  for(const d of DOMAIN_ORDER){
+    const tops=state.tasks.filter(x=>x.parentId===null&&x.domain===d&&x.status!=='done');
+    if(!tops.length)continue;
+    tops.sort((a,b)=>((b.pinned?1:0)-(a.pinned?1:0))||(SECTION_ORDER.indexOf(a.status)-SECTION_ORDER.indexOf(b.status))||(a.createdAt-b.createdAt));
+    const key='dom:'+d,collapsed=state.ui.collapsed[key],totEst=tops.reduce((a,x)=>a+(rollupEst(x)||0),0);
+    html+='<div class="section '+(collapsed?'collapsed':'')+'" data-sec="'+key+'"><div class="shead" data-act="sec" data-sec="'+key+'"><h2>'+DOMAINS[d]+'</h2><span class="cnt">'+tops.length+'</span>'+(totEst?'<span class="est">&#9201; ~'+fmtMin(totEst)+' total</span>':'<span class="est"></span>')+'<span class="car">&#9660;</span></div><div class="slist">'+tops.map(x=>taskHTML(x,false)).join('')+'</div></div>';
+  }
+  const dones=state.tasks.filter(x=>x.parentId===null&&x.status==='done');
+  if(dones.length){
+    const collapsed=state.ui.collapsed['done'];
+    html+='<div class="section '+(collapsed?'collapsed':'')+'" data-sec="done"><div class="shead" data-act="sec" data-sec="done"><span class="dot done"></span><h2>'+STATUS.done.label+'</h2><span class="cnt">'+dones.length+'</span><span class="est"></span><span class="car">&#9660;</span></div><div class="slist">'+dones.map(x=>taskHTML(x,false)).join('')+'</div></div>';
   }
   board.innerHTML=html||'<div class="empty"><div class="big">Clean slate.</div><p>Add a task or park an idea to get going.</p></div>';
 }
@@ -813,8 +854,8 @@ function closeLog(){document.getElementById('logOverlay').classList.remove('on')
 function setStatus(id,s){const x=state.tasks.find(t=>t.id===id);if(!x)return;if(s==='done'){completeTask(id);return;}x.status=s;}
 function editEst(id){const x=state.tasks.find(t=>t.id===id);if(!x)return;const v=prompt('Estimate in minutes for:\n\n'+x.title+'\n\n(numbers only \u2014 small first steps beat scary big ones)',x.est||'');if(v===null)return;const n=parseInt(v,10);x.est=isNaN(n)?null:n;render();}
 function parkIdea(text){if(!text.trim())return;state.parked.unshift({id:uid(),text:text.trim(),createdAt:Date.now()});toast('Parked. It\u2019s safe. <b>Eyes back on the prize.</b> &#128064;');}
-function promoteParked(pid){const i=state.parked.findIndex(p=>p.id===pid);if(i<0)return;const p=state.parked.splice(i,1)[0];state.tasks.push({id:uid(),title:p.text,status:'idea',est:null,parentId:null,url:null,pinned:false,firstStep:null,resumeLine:'',actualMinutes:null,domain:domainFilter==='all'?'work':domainFilter,ref:false,createdAt:Date.now(),completedAt:null});toast('Promoted to an Idea \u2014 it\u2019s on the board now.');view='all';syncTabs();}
-function addTask(){const title=prompt('New task \u2014 what is it?');if(!title||!title.trim())return;const est=prompt('Rough estimate in minutes? (leave blank if unsure)','');const n=parseInt(est,10);state.tasks.push({id:uid(),title:title.trim(),status:'next',est:isNaN(n)?null:n,parentId:null,url:null,pinned:false,firstStep:null,resumeLine:'',actualMinutes:null,domain:domainFilter==='all'?'work':domainFilter,ref:false,createdAt:Date.now(),completedAt:null});toast('Added to <b>Next Priority</b>. Set its status whenever.');}
+function promoteParked(pid){const i=state.parked.findIndex(p=>p.id===pid);if(i<0)return;const p=state.parked.splice(i,1)[0];state.tasks.push({id:uid(),title:p.text,status:'idea',est:null,parentId:null,url:null,pinned:false,firstStep:null,resumeLine:'',actualMinutes:null,domain:'work',ref:false,createdAt:Date.now(),completedAt:null});toast('Promoted to an Idea \u2014 it\u2019s on the board now.');view='all';syncTabs();}
+function addTask(){const title=prompt('New task \u2014 what is it?');if(!title||!title.trim())return;const est=prompt('Rough estimate in minutes? (leave blank if unsure)','');const n=parseInt(est,10);state.tasks.push({id:uid(),title:title.trim(),status:'next',est:isNaN(n)?null:n,parentId:null,url:null,pinned:false,firstStep:null,resumeLine:'',actualMinutes:null,domain:'work',ref:false,createdAt:Date.now(),completedAt:null});toast('Added to <b>Next Priority</b>. Set its status whenever.');}
 function addSub(pid,title){if(!title.trim())return;const parent=state.tasks.find(t=>t.id===pid);state.tasks.push({id:uid(),title:title.trim(),status:parent?parent.status:'team',est:null,parentId:pid,url:null,pinned:false,firstStep:null,resumeLine:'',actualMinutes:null,domain:parent?parent.domain:'work',ref:false,createdAt:Date.now(),completedAt:null});state.ui.open[pid]=true;}
 
 /* ===================== events ===================== */
@@ -832,6 +873,8 @@ board.addEventListener('click',e=>{
   else if(act==='del'){deleteTask(id);}
   else if(act==='domain'){cycleDomain(id);render();}
   else if(act==='focus'){openFocus(id);}
+  else if(act==='ritual-keep'){state.meta.ritualDay=todayKey();render();toast('Locked. Go. &#127919;');}
+  else if(act==='ritual-pick'){state.meta.ritualDay=todayKey();const old=state.tasks.find(t=>t.pinned);if(old)old.pinned=false;const p=pickTask();if(p){topOf(p).pinned=true;if(p.status!=='done')p.status='progress';render();openFocus(p.id);}else{render();toast('Nothing to pick \u2014 the board\u2019s clear. &#127881;');}}
   else if(act==='edit-resume'){editingResume=id;render();const i=document.querySelector('[data-resumeedit="'+id+'"]');if(i){i.focus();try{i.setSelectionRange(i.value.length,i.value.length);}catch(e){}}}
 });
 board.addEventListener('change',e=>{const el=e.target.closest('[data-act="status"]');if(el){setStatus(el.dataset.id,el.value);render();}});
@@ -897,7 +940,6 @@ document.getElementById('pickBtn').onclick=openPick;
 document.getElementById('addBtn').onclick=()=>{addTask();render();};
 document.getElementById('wrapBtn').onclick=openWrap;
 document.getElementById('tabs').addEventListener('click',e=>{const t=e.target.closest('.tab');if(!t)return;view=t.dataset.view;syncTabs();render();});
-document.getElementById('dfilter').addEventListener('click',e=>{const p=e.target.closest('.dpill');if(!p)return;setDomainFilter(p.dataset.domain);});
 function syncTabs(){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.view===view));}
 
 /* sync menu */
