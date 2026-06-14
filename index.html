@@ -103,10 +103,12 @@ body{
 .dot.progress{background:var(--green);box-shadow:0 0 10px rgba(43,208,122,.5)}
 .dot.next{background:var(--orange);box-shadow:0 0 10px rgba(245,147,59,.45)}
 .dot.help{background:var(--yellow)}
+.dot.blocked{background:#8a93ff;box-shadow:0 0 9px rgba(138,147,255,.5)}
 .dot.team{background:#2c3543;border:1.5px solid #56627a}
-.dot.idea{background:transparent;border:2px solid var(--red)}
+.dot.idea{background:radial-gradient(circle at 35% 30%,#e6b3ff,#c77dff 55%,#ff8fd8);box-shadow:0 0 7px rgba(199,125,255,.75);animation:twinkle 2.6s ease-in-out infinite}
 .dot.lagging{background:var(--red);box-shadow:0 0 10px rgba(241,91,91,.5)}
 .dot.done{background:#3a4452}
+@keyframes twinkle{0%,100%{box-shadow:0 0 5px rgba(199,125,255,.45);filter:saturate(.9)}50%{box-shadow:0 0 11px rgba(255,143,216,.95);filter:saturate(1.25)}}
 
 .task{background:var(--panel);border:1px solid var(--line-soft);border-radius:12px;padding:11px 13px;display:flex;align-items:flex-start;gap:11px;transition:.15s;position:relative}
 .task:hover{border-color:#2c3848}
@@ -204,13 +206,30 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
 .ttdisk svg{display:block}
 .timer .clock{font-family:var(--mono);font-weight:700;letter-spacing:1px}
 .ttclock{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:27px}
-.timer .clock.over{color:var(--orange)}
+.timer .clock.over{color:var(--green)}
 .timer .tgt{font-family:var(--mono);font-size:13px;color:var(--muted)}
 .ckrow{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;margin-bottom:16px}
 .cklabel{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-2);margin-right:2px}
 .ckpill{border:1px solid var(--line-soft);background:var(--panel-2);color:var(--muted);font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:999px;cursor:pointer}
 .ckpill:hover{color:var(--txt);border-color:var(--line)}
 .ckpill.on{color:var(--accent);border-color:var(--accent);background:rgba(110,168,255,.10)}
+.nudgerow{display:flex;justify-content:center;margin:-8px 0 16px}
+.fparkbox{width:100%;box-sizing:border-box;margin:0 0 14px;background:var(--panel-2);border:1px dashed var(--line);border-radius:10px;padding:9px 12px;font-size:13px;color:var(--txt)}
+.fparkbox::placeholder{color:var(--muted-2)}
+.fparkbox:focus{outline:none;border-color:var(--accent);border-style:solid}
+.subdone-note{font-size:11.5px;color:var(--muted-2);cursor:pointer;padding:4px 2px 4px 8px;user-select:none}
+.subdone-note:hover{color:var(--muted)}
+.rbanner{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.32);border-radius:12px;padding:11px 14px;font-size:13.5px;margin-bottom:12px;animation:rise .4s ease both}
+.rbanner .rbtns{margin-left:auto;display:flex;gap:7px}
+.rlist{display:flex;flex-direction:column;gap:8px;margin:4px 0 16px;max-height:48vh;overflow:auto}
+.rrow{display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--line-soft);border-radius:11px;padding:9px 12px;flex-wrap:wrap}
+.rmain{flex:1;min-width:170px;font-size:13.5px;line-height:1.35}
+.rmeta{font-size:11px;color:var(--muted-2);margin-top:3px;display:flex;align-items:center}
+.rbtns{display:flex;gap:6px;flex-wrap:wrap}
+.btn.sm.danger{color:var(--red)}
+.btn.sm.danger:hover{border-color:var(--red)}
+.wipwarn{background:rgba(245,147,59,.08);border:1px solid rgba(245,147,59,.28);border-radius:10px;padding:9px 12px;font-size:12.5px;margin-bottom:12px;color:#f3c08a}
+.rmore{text-align:center;color:var(--muted-2);font-size:12px;margin:-6px 0 12px}
 .focus .steps{margin-bottom:20px;display:flex;flex-direction:column;gap:8px}
 .focus .step{display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--line-soft);border-radius:10px;padding:10px 12px;font-size:13.5px}
 .focus .fbtns{display:flex;gap:9px;flex-wrap:wrap}
@@ -258,7 +277,7 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
 
   <div class="top">
     <div class="brand">
-      <div class="logo"><b>T</b></div>
+      <div class="logo" id="logo"><b>T</b></div>
       <div>
         <h1>Tempo</h1>
         <p>One thing at a time. Keep the pace.</p>
@@ -301,12 +320,13 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
     <div class="legend" id="legend"></div>
   </div>
 
-  <div class="foot">Tempo &middot; one thing at a time &middot; <b style="color:var(--accent)">build v8 &middot; frozen</b></div>
+  <div class="foot">Tempo &middot; one thing at a time &middot; <b style="color:var(--accent)">build v9 &middot; frozen</b></div>
 </div>
 
 <div class="overlay" id="overlay"><div class="focus" id="focusCard"></div></div>
 <div class="overlay" id="logOverlay"><div class="focus" id="logCard" style="max-width:420px"></div></div>
 <div class="overlay" id="wrapOverlay"><div class="focus" id="wrapCard"></div></div>
+<div class="overlay" id="reviewOverlay"><div class="focus" id="reviewCard" style="max-width:540px"></div></div>
 
 <!-- connect overlay -->
 <input type="file" id="importInput" accept="application/json,.json" style="display:none">
@@ -388,13 +408,14 @@ function tokenDaysLeft(){if(!tokenExpiry)return null;return Math.ceil((tokenExpi
 const STATUS={
   progress:{label:'In Progress',short:'In progress'},
   next:{label:'Next Priority',short:'Next priority'},
+  blocked:{label:'Blocked / Waiting on',short:'Blocked / waiting'},
   lagging:{label:'Personal Goals \u2014 Lagging',short:'Lagging'},
   help:{label:'Help a teammate',short:'Help a teammate'},
   team:{label:'Better for the team',short:'Better for the team'},
   idea:{label:'Personal Goals \u2014 Ideas',short:'Idea'},
   done:{label:'Done',short:'Done'}
 };
-const SECTION_ORDER=['progress','next','lagging','help','team','idea','done'];
+const SECTION_ORDER=['progress','next','blocked','lagging','help','team','idea','done'];
 const FOCUS_STATUSES=['progress'];
 const DOMAINS={work:'Work',fun:'Fun',growth:'Growth'};
 const DOMAIN_ORDER=['work','fun','growth'];
@@ -428,7 +449,7 @@ function normalize(o){
   s.ui.open=s.ui.open||{};
   if(typeof s.meta.doneToday!=='number')s.meta.doneToday=0;
   if(!s.meta.doneDate)s.meta.doneDate=todayKey();
-  s.tasks=s.tasks.map(t=>Object.assign({est:null,parentId:null,url:null,pinned:false,firstStep:null,resumeLine:'',actualMinutes:null,domain:'work',ref:false,createdAt:Date.now(),completedAt:null,status:'team',title:'(untitled)'},t));
+  s.tasks=s.tasks.map(t=>{const o=Object.assign({est:null,parentId:null,url:null,pinned:false,firstStep:null,resumeLine:'',actualMinutes:null,domain:'work',ref:false,createdAt:Date.now(),completedAt:null,status:'team',title:'(untitled)',focusedSeconds:0,touchedAt:null},t);if(!o.touchedAt)o.touchedAt=Date.now();return o;});
   return s;
 }
 
@@ -590,7 +611,7 @@ function renderStats(){
   const inprog=state.tasks.filter(x=>x.status==='progress'&&!x.ref).length;
   const cal=calibration();
   let calHtml;
-  if(cal){const r=cal.ratio,pct=Math.round(Math.abs(r-1)*100);const phrase=pct<=10?'spot on':(r>1?'~'+pct+'% over':'~'+pct+'% under');const col=pct<=10?'var(--green)':(r>1?'var(--orange)':'var(--accent)');calHtml='<div class="stat" title="Rolling actual \u00f7 estimate over your last '+cal.n+' finished tasks. Pad new estimates by this.">'+'<div class="n" style="color:'+col+'">\u00d7'+r.toFixed(1)+'</div><div class="l">'+phrase+'</div></div>';}
+  if(cal){const r=cal.ratio;calHtml='<div class="stat" title="Rolling actual \u00f7 estimate over your last '+cal.n+' finished tasks. Multiply new estimates by this to plan realistically \u2014 it\u2019s a planning factor, not a grade.">'+'<div class="n" style="color:var(--muted)">\u00d7'+r.toFixed(1)+'</div><div class="l">pad estimates</div></div>';}
   else calHtml='<div class="stat" title="Finish a couple of estimated tasks and log actual time to calibrate."><div class="n" style="color:var(--muted-2)">\u2014</div><div class="l">calibrating</div></div>';
   document.getElementById('stats').innerHTML=
     '<div class="stat"><div class="n" style="color:var(--green)">'+inprog+'</div><div class="l">In progress</div></div>'+
@@ -632,7 +653,7 @@ function taskHTML(x,isSub){
   if(x.status==='progress'&&!x.ref){
     if(editingResume===x.id)resumeBlock='<div class="resume editing"><input class="resume-input" data-resumeedit="'+x.id+'" value="'+escapeHtml(x.resumeLine||'')+'" placeholder="next physical action \u2014 the exact thing to do first"></div>';
     else if(x.resumeLine)resumeBlock='<div class="resume" data-act="edit-resume" data-id="'+x.id+'" title="Click to edit your resume note">&#8592; '+escapeHtml(x.resumeLine)+'</div>';
-    else resumeBlock='<div class="resume muted" data-act="edit-resume" data-id="'+x.id+'">&#8592; add a resume note</div>';
+    else if(isOpen)resumeBlock='<div class="resume muted" data-act="edit-resume" data-id="'+x.id+'">&#8592; add a resume note</div>';
   }
   return '<div class="task '+(isSub?'sub':'')+' '+(dimmed?'dim':'')+' '+(isDone?'isdone':'')+' '+(x.pinned?'pinned':'')+' '+(isOpen?'open':'')+'" data-id="'+x.id+'">'+
     (!x.ref?'<div class="check '+(isDone?'on':'')+'" data-act="check" data-id="'+x.id+'" title="Mark done"></div>':'<div style="width:19px;flex:none"></div>')+
@@ -643,8 +664,13 @@ function taskHTML(x,isSub){
     '<div class="expand"><span class="caret" data-act="toggle" data-id="'+x.id+'">'+(hasKids?'&#9660;':'&#43;')+'</span></div></div>'+
     (isOpen?renderChildren(x.id):'');
 }
+const revealedDone=new Set();
 function renderChildren(pid){
-  let html=kids(pid).map(c=>taskHTML(c,true)).join('');
+  const all=kids(pid), show=revealedDone.has(pid);
+  const live=show?all:all.filter(c=>c.status!=='done');
+  let html=live.map(c=>taskHTML(c,true)).join('');
+  const doneN=all.filter(c=>c.status==='done').length;
+  if(doneN)html+='<div class="subdone-note" data-act="revealdone" data-id="'+pid+'">'+(show?'&#10003; hide '+doneN+' done':'&#10003; '+doneN+' done &middot; show')+'</div>';
   html+='<div class="addrow"><input data-addsub="'+pid+'" placeholder="+ add a sub-task to break this down&hellip; (Enter)"></div>';
   return '<div class="children">'+html+'</div>';
 }
@@ -657,9 +683,10 @@ function ritualHTML(){
   if(pin)return '<div class="ritual">&#127749; New day. Still THE ONE: <b>'+escapeHtml(pin.title)+'</b>?<span class="rbtns"><button class="btn sm" data-act="ritual-keep">Yes &mdash; lock it</button><button class="btn sm ghost" data-act="ritual-pick">Pick another for me</button></span></div>';
   return '<div class="ritual">&#127749; New day. Pick today&rsquo;s ONE before the inbox picks it for you.<span class="rbtns"><button class="btn sm" data-act="ritual-pick">&#127919; Pick one for me</button></span></div>';
 }
+function reviewBanner(){const n=staleList().length;if(!n||reviewDismissed)return '';return '<div class="rbanner">&#129529; '+n+(n>1?' items have':' item has')+' sat untouched 2+ weeks. A 2-min prune keeps the board honest.<span class="rbtns"><button class="btn sm" data-act="openreview">Review</button><button class="btn sm ghost" data-act="review-dismiss">Not now</button></span></div>';}
 function renderFocusView(){
   const items=focusTops();
-  const ritual=ritualHTML();
+  const ritual=ritualHTML()+reviewBanner();
   if(!items.length){
     board.innerHTML=ritual+'<div class="empty"><div class="big">Nothing\u2019s "in progress."</div><p>That\u2019s not a problem \u2014 it\u2019s a decision waiting to happen. Don\u2019t agonize. Let me pick, and start the clock.</p><button class="btn primary" id="pickEmpty">&#127919; Pick one for me</button></div>';
     document.getElementById('pickEmpty').onclick=openPick;return;
@@ -721,6 +748,9 @@ const MUTE_KEY='tempo-muted';
 let audioCtx=null, chimed=false, muted=(lsGet(MUTE_KEY)!=='0'); // default muted (work-safe)
 const CK_KEY='tempo-checkpoint';
 let checkpointMin=parseInt(lsGet(CK_KEY)||'0',10)||0, ckCount=0;
+const NUDGE_KEY='tempo-nudge';
+let nudgeOn=(lsGet(NUDGE_KEY)==='1'), idleTimer=null;
+function armIdle(){clearTimeout(idleTimer);if(nudgeOn&&document.getElementById('overlay').classList.contains('on')&&!timerInt){idleTimer=setTimeout(()=>{const x=state.tasks.find(t=>t.id===timerTaskId);document.title='\ud83d\udc40 still on this? \u00b7 '+(x?x.title+' \u00b7 ':'')+BASE_TITLE;},300000);}}
 function unlockAudio(){try{if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')audioCtx.resume();}catch(e){}}
 function playChime(){
   if(muted)return;
@@ -747,7 +777,8 @@ function pickTask(){
 function openPick(){const x=pickTask();if(!x){toast('Nothing left to pick. Either you\u2019re done, or everything\u2019s parked. Both fine. &#127881;');return;}if(x.status!=='done'){x.status='progress';render();}openFocus(x.id);}
 function openFocus(id){
   const x=state.tasks.find(t=>t.id===id);if(!x)return;
-  timerTaskId=id;timerElapsed=0;timerInt=null;chimed=false;ckCount=0;timerTarget=(rollupEst(x)||25)*60;
+  timerTaskId=id;timerElapsed=x.focusedSeconds||0;timerInt=null;chimed=false;ckCount=0;timerTarget=(rollupEst(x)||25)*60;
+  ckCount=checkpointMin>0?Math.floor(timerElapsed/(checkpointMin*60)):0;
   const parent=x.parentId?state.tasks.find(t=>t.id===x.parentId):null;
   const childSteps=kids(x.id).filter(c=>!c.ref);
   let stepsHtml='';
@@ -755,10 +786,11 @@ function openFocus(id){
   else if(childSteps.length)stepsHtml=childSteps.map(c=>'<div class="step"><div class="check '+(c.status==='done'?'on':'')+'" data-act="fcheck" data-id="'+c.id+'"></div><div>'+escapeHtml(c.title)+'</div></div>').join('');
   else stepsHtml='<div class="step"><span class="dot next" style="width:9px;height:9px"></span><div>No sub-steps yet. First move: spend 2 minutes writing the very first concrete action \u2014 then do that.</div></div>';
   const ckPills=[['0','Off'],['10','10m'],['25','25m'],['45','45m'],['90','90m']].map(o=>'<button class="ckpill'+(checkpointMin===+o[0]?' on':'')+'" data-act="ck" data-min="'+o[0]+'">'+o[1]+'</button>').join('');
-  document.getElementById('focusCard').innerHTML='<button class="xclose" data-act="closefocus">&times;</button>'+(muted?'<button class="mutebtn" id="muteBtn" data-act="mute" title="Sound off \u2014 tap to unmute">\ud83d\udd07</button>':'<button class="mutebtn" id="muteBtn" data-act="mute" title="Sound on \u2014 tap to mute">\ud83d\udd0a</button>')+'<div class="kicker"><span class="dot '+x.status+'" style="width:9px;height:9px"></span>'+(parent?escapeHtml(parent.title)+' &rsaquo; ':'')+'your one thing</div><h2>'+escapeHtml(x.title)+'</h2><div class="ctx">Everything else can wait. The clock\u2019s the only thing watching \u2014 start it and beat the estimate.</div><div class="timer"><div class="ttdisk"><svg viewBox="0 0 132 132" width="120" height="120"><circle cx="66" cy="66" r="58" fill="var(--line-soft)" opacity=".22"></circle><path id="ttWedge" fill="var(--accent)"></path><circle id="ttRing" cx="66" cy="66" r="58" fill="none" stroke="var(--line)" stroke-width="2.5"></circle></svg><div class="clock ttclock" id="clock">00:00</div></div><div class="tgt">~'+fmtMin(rollupEst(x)||25)+' target</div></div><div class="ckrow"><span class="cklabel">&#128276; check-in</span>'+ckPills+'</div><div class="steps">'+stepsHtml+'</div><div class="fbtns"><button class="btn primary" data-act="timer">&#9654; Start clock</button><button class="btn" data-act="fdone">&#10003; Finished it</button>'+(PIP_OK?'<button class="btn ghost" data-act="pip" title="Float a mini timer on top of your other apps">&#10697; Pop out</button>':'')+'<button class="btn ghost" data-act="fpark">Park &amp; pick another</button></div>';
-  document.getElementById('overlay').classList.add('on');updateClock();
+  document.getElementById('focusCard').innerHTML='<button class="xclose" data-act="closefocus">&times;</button>'+(muted?'<button class="mutebtn" id="muteBtn" data-act="mute" title="Sound off \u2014 tap to unmute">\ud83d\udd07</button>':'<button class="mutebtn" id="muteBtn" data-act="mute" title="Sound on \u2014 tap to mute">\ud83d\udd0a</button>')+'<div class="kicker"><span class="dot '+x.status+'" style="width:9px;height:9px"></span>'+(parent?escapeHtml(parent.title)+' &rsaquo; ':'')+'your one thing</div><h2>'+escapeHtml(x.title)+'</h2><div class="ctx">Everything else can wait. The clock\u2019s the only thing watching \u2014 start it and beat the estimate.</div><div class="timer"><div class="ttdisk"><svg viewBox="0 0 132 132" width="120" height="120"><circle cx="66" cy="66" r="58" fill="var(--line-soft)" opacity=".22"></circle><path id="ttWedge" fill="var(--accent)"></path><circle id="ttRing" cx="66" cy="66" r="58" fill="none" stroke="var(--line)" stroke-width="2.5"></circle></svg><div class="clock ttclock" id="clock">00:00</div></div><div class="tgt">~'+fmtMin(rollupEst(x)||25)+' target</div></div><div class="ckrow"><span class="cklabel">&#128276; check-in</span>'+ckPills+'</div><div class="nudgerow"><button class="ckpill'+(nudgeOn?' on':'')+'" data-act="nudge">\ud83d\udc40 drift nudge: '+(nudgeOn?'on':'off')+'</button></div><div class="steps">'+stepsHtml+'</div><input class="fparkbox" data-fpark placeholder="\ud83d\udca1 stray thought? park it here \u2014 Enter (clock keeps running)"><div class="fbtns"><button class="btn primary" data-act="timer">&#9654; '+((x.focusedSeconds||0)>0?'Resume clock':'Start clock')+'</button><button class="btn" data-act="fdone">&#10003; Finished it</button>'+(PIP_OK?'<button class="btn ghost" data-act="pip" title="Float a mini timer on top of your other apps">&#10697; Pop out</button>':'')+'<button class="btn ghost" data-act="fpark">Park &amp; pick another</button></div>';
+  document.getElementById('overlay').classList.add('on');updateClock();armIdle();
 }
-function closeFocus(){document.getElementById('overlay').classList.remove('on');stopTimer();document.title=BASE_TITLE;if(pipWin&&!pipWin.closed){try{pipWin.close();}catch(e){}}pipWin=null;render();}
+function saveFocusTime(){const ct=state.tasks.find(t=>t.id===timerTaskId);if(ct)ct.focusedSeconds=timerElapsed;}
+function closeFocus(){document.getElementById('overlay').classList.remove('on');stopTimer();saveFocusTime();clearTimeout(idleTimer);document.title=BASE_TITLE;if(pipWin&&!pipWin.closed){try{pipWin.close();}catch(e){}}pipWin=null;render();}
 function fmtClock(tot){return String(Math.floor(tot/60)).padStart(2,'0')+':'+String(tot%60).padStart(2,'0');}
 function wedgePath(cx,cy,r,frac){
   if(frac<=0)return ''; frac=Math.min(frac,0.9999);
@@ -771,18 +803,18 @@ function updateClock(){
   const tot=timerElapsed+(timerInt?Math.floor((Date.now()-timerStart)/1000):0);
   const txt=fmtClock(tot), over=tot>timerTarget;
   const el=document.getElementById('clock'); if(el){el.textContent=txt;el.classList.toggle('over',over);}
-  if(over&&!chimed&&timerInt&&timerTarget>0){chimed=true;playChime();toast('\u23f0 Time\u2019s up \u2014 you\u2019ve hit your ~'+fmtMin(Math.round(timerTarget/60))+' estimate. Wrap or push on.');}
-  const frac=timerTarget>0?Math.max(0,(timerTarget-tot)/timerTarget):0;
+  if(over&&!chimed&&timerInt&&timerTarget>0){chimed=true;playChime();toast('\u2728 You\u2019ve reached your ~'+fmtMin(Math.round(timerTarget/60))+' mark. In flow? keep rolling. Done? log it \u2014 no rush, no grade.');}
+  const frac=timerTarget>0?Math.min(1,tot/timerTarget):0;
   const ww=document.getElementById('ttWedge'); if(ww)ww.setAttribute('d',wedgePath(66,66,58,frac));
-  const rr=document.getElementById('ttRing'); if(rr)rr.setAttribute('stroke',over?'var(--orange)':'var(--line)');
+  const rr=document.getElementById('ttRing'); if(rr)rr.setAttribute('stroke',over?'var(--green)':'var(--line)');
   if(checkpointMin>0&&timerInt){const n=Math.floor(tot/(checkpointMin*60));if(n>ckCount&&n>0){ckCount=n;playChime();toast('\ud83d\udd14 Checkpoint \u2014 flowing or fighting? In it \u2192 bump the interval up. Drifted \u2192 back to the one thing.');}}
   const x=state.tasks.find(t=>t.id===timerTaskId);
-  if(timerInt)document.title=(over?'\ud83d\udd34 ':'\u23f1\ufe0f ')+txt+(x?' \u00b7 '+x.title:'')+' \u2014 '+BASE_TITLE;
-  if(pipWin&&!pipWin.closed){const pd=pipWin.document;const pe=pd.getElementById('pipClk');if(pe){pe.textContent=txt;pe.classList.toggle('over',over);}const pw=pd.getElementById('pipWedge');if(pw)pw.setAttribute('d',wedgePath(66,66,58,frac));const pr=pd.getElementById('pipRing');if(pr)pr.setAttribute('stroke',over?'#f5933b':'#2a3342');}
+  if(timerInt)document.title=(over?'\u2728 ':'\u23f1\ufe0f ')+txt+(x?' \u00b7 '+x.title:'')+' \u2014 '+BASE_TITLE;
+  if(pipWin&&!pipWin.closed){const pd=pipWin.document;const pe=pd.getElementById('pipClk');if(pe){pe.textContent=txt;pe.classList.toggle('over',over);}const pw=pd.getElementById('pipWedge');if(pw)pw.setAttribute('d',wedgePath(66,66,58,frac));const pr=pd.getElementById('pipRing');if(pr)pr.setAttribute('stroke',over?'#2bd07a':'#2a3342');}
 }
 function toggleTimer(btn){
-  if(timerInt){stopTimer();if(btn)btn.innerHTML='&#9654; Resume';const x=state.tasks.find(t=>t.id===timerTaskId);document.title='\u23f8\ufe0f '+(x?x.title+' \u2014 ':'')+BASE_TITLE;}
-  else{timerStart=Date.now();timerInt=setInterval(updateClock,500);if(btn)btn.innerHTML='&#10073;&#10073; Pause';unlockAudio();updateClock();}
+  if(timerInt){stopTimer();saveFocusTime();scheduleSave();if(btn)btn.innerHTML='&#9654; Resume';const x=state.tasks.find(t=>t.id===timerTaskId);document.title='\u23f8\ufe0f '+(x?x.title+' \u2014 ':'')+BASE_TITLE;armIdle();}
+  else{clearTimeout(idleTimer);timerStart=Date.now();timerInt=setInterval(updateClock,500);if(btn)btn.innerHTML='&#10073;&#10073; Pause';unlockAudio();updateClock();}
 }
 function stopTimer(){if(timerInt){timerElapsed+=Math.floor((Date.now()-timerStart)/1000);clearInterval(timerInt);timerInt=null;}}
 async function openPiP(){
@@ -791,7 +823,7 @@ async function openPiP(){
   try{pipWin=await documentPictureInPicture.requestWindow({width:220,height:210});}
   catch(e){toast('Couldn\u2019t open the floating window.');return;}
   const d=pipWin.document, st=d.createElement('style');
-  st.textContent='*{box-sizing:border-box}body{margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:#0f1319;color:#e8edf5;font-family:system-ui,sans-serif;-webkit-user-select:none;user-select:none}.ptask{font-size:12px;color:#9fb0c3;max-width:92%;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ttd{position:relative;width:120px;height:120px}.ttd svg{display:block}.clk{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:27px;font-weight:700;letter-spacing:1px}.clk.over{color:#f5933b}';
+  st.textContent='*{box-sizing:border-box}body{margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:#0f1319;color:#e8edf5;font-family:system-ui,sans-serif;-webkit-user-select:none;user-select:none}.ptask{font-size:12px;color:#9fb0c3;max-width:92%;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ttd{position:relative;width:120px;height:120px}.ttd svg{display:block}.clk{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:27px;font-weight:700;letter-spacing:1px}.clk.over{color:#2bd07a}';
   d.head.appendChild(st);
   d.body.innerHTML='<div class="ptask" id="pipTask"></div><div class="ttd"><svg viewBox="0 0 132 132" width="120" height="120"><circle cx="66" cy="66" r="58" fill="#1b2230"></circle><path id="pipWedge" fill="#6ea8ff"></path><circle id="pipRing" cx="66" cy="66" r="58" fill="none" stroke="#2a3342" stroke-width="2.5"></circle></svg><div class="clk" id="pipClk">00:00</div></div>';
   syncPiP(); updateClock();
@@ -805,7 +837,33 @@ function syncPiP(){
   if(g)g.textContent='target ~'+fmtMin(Math.round(timerTarget/60)||25);
 }
 
-/* ===================== mutations ===================== */
+/* ===================== backlog review ===================== */
+const STALE_DAYS=14, REVIEW_CAP=12, WIP_LIMIT=5;
+let reviewDismissed=false;
+function ageDays(x){return Math.floor((Date.now()-(x.touchedAt||x.createdAt))/86400000);}
+function isStale(x){return !x.ref&&x.parentId===null&&!x.pinned&&x.status!=='done'&&x.status!=='progress'&&ageDays(x)>=STALE_DAYS;}
+function staleList(){return state.tasks.filter(isStale).sort((a,b)=>(a.touchedAt||a.createdAt)-(b.touchedAt||b.createdAt));}
+function nextCount(){return state.tasks.filter(x=>x.status==='next'&&!x.ref).length;}
+function demoteStatus(s){const order=['progress','next','blocked','lagging','help','team','idea'];const i=order.indexOf(s);return i<0?'team':order[Math.min(i+1,order.length-1)];}
+function reviewKeep(id){const x=state.tasks.find(t=>t.id===id);if(x)x.touchedAt=Date.now();openReview();scheduleSave();}
+function reviewDemote(id){const x=state.tasks.find(t=>t.id===id);if(x){x.status=demoteStatus(x.status);x.touchedAt=Date.now();}openReview();scheduleSave();}
+function reviewPark(id){const x=state.tasks.find(t=>t.id===id);if(!x)return;state.parked.unshift({id:uid(),text:x.title,createdAt:Date.now()});const drop=new Set([id]);kids(id).forEach(c=>drop.add(c.id));state.tasks=state.tasks.filter(t=>!drop.has(t.id));openReview();scheduleSave();}
+function reviewDelete(id){const drop=new Set([id]);kids(id).forEach(c=>drop.add(c.id));state.tasks=state.tasks.filter(t=>!drop.has(t.id));openReview();scheduleSave();}
+function openReview(){
+  const list=staleList(), shown=list.slice(0,REVIEW_CAP), nc=nextCount();
+  let head='<button class="xclose" data-act="closereview">&times;</button><div class="kicker">&#129529; backlog review</div><h2>Prune what\u2019s gone stale</h2>';
+  let intro;
+  if(!list.length)intro='<div class="ctx">Nothing\u2019s been sitting untouched for '+STALE_DAYS+'+ days. Backlog\u2019s tidy. &#9989;</div>';
+  else intro='<div class="ctx">These haven\u2019t moved in '+STALE_DAYS+'+ days. For each: still real? <b>Keep</b> it. Not now? <b>Demote</b>. Just an itch? <b>Park</b> it. Dead? <b>Delete</b>. Decide fast \u2014 gut calls only.</div>';
+  let wip = nc>WIP_LIMIT ? '<div class="wipwarn">&#9888;&#65039; '+nc+' tasks sit in <b>Next priority</b> \u2014 that\u2019s a lot to choose from. Demote a few so \u201cnext\u201d stays a real shortlist.</div>' : '';
+  let rows = shown.map(x=>'<div class="rrow"><div class="rmain"><span class="dot '+x.status+'" style="width:9px;height:9px;margin-right:7px;vertical-align:middle"></span>'+escapeHtml(x.title)+'<div class="rmeta"><span class="dot '+x.status+'" style="width:7px;height:7px;margin-right:5px"></span>'+STATUS[x.status].short+' &middot; '+ageDays(x)+'d untouched</div></div><div class="rbtns"><button class="btn sm" data-act="rkeep" data-id="'+x.id+'" title="Still relevant \u2014 resets the clock">Keep</button><button class="btn sm ghost" data-act="rdemote" data-id="'+x.id+'" title="Push down a tier">Demote</button><button class="btn sm ghost" data-act="rpark" data-id="'+x.id+'" title="Move to the idea airlock">Park</button><button class="btn sm ghost danger" data-act="rdelete" data-id="'+x.id+'" title="Delete for good">&#128465;</button></div></div>').join('');
+  let more = list.length>REVIEW_CAP ? '<div class="rmore">+ '+(list.length-REVIEW_CAP)+' more stale \u2014 clear these first, reopen for the rest.</div>' : '';
+  document.getElementById('reviewCard').innerHTML=head+intro+wip+(rows?'<div class="rlist">'+rows+'</div>':'')+more+'<div class="fbtns"><button class="btn" data-act="closereview">Done for now</button></div>';
+  document.getElementById('reviewOverlay').classList.add('on');
+}
+function closeReview(){document.getElementById('reviewOverlay').classList.remove('on');reviewDismissed=true;render();}
+
+
 function completeTask(id,silent,suggested){
   const x=state.tasks.find(t=>t.id===id);if(!x)return;
   const goingDone=x.status!=='done';
@@ -819,7 +877,7 @@ function completeTask(id,silent,suggested){
 const FINISH_LINES=['Finished. <b>Actually</b> finished. Look at you. &#127881;','Closed it out \u2014 the part most people skip. &#128170;','Done and dusted. Momentum\u2019s yours, ride it.','One fewer open loop in your head. Feels good, right?','That\u2019s a finish, not a \u201cmoved-on.\u201d Big difference. &#9889;'];
 function pickFinishLine(){return FINISH_LINES[Math.floor(Math.random()*FINISH_LINES.length)];}
 function celebrate(){confetti();toast(pickFinishLine());}
-function accuracy(est,actual){const r=actual/est,pct=Math.round(Math.abs(r-1)*100);if(pct<=10)return{text:'right on the nose',color:'var(--green)'};if(r>1)return{text:'+'+pct+'% over',color:'var(--orange)'};return{text:'-'+pct+'% under',color:'var(--accent)'};}
+function accuracy(est,actual){const r=actual/est;if(Math.abs(r-1)<=0.1)return{text:'about right',color:'var(--muted)'};return{text:'took \u00d7'+r.toFixed(1),color:'var(--muted)'};}
 function calibration(){
   const leaves=state.tasks.filter(t=>t.status==='done'&&t.actualMinutes>0&&t.est>0&&kids(t.id).filter(c=>!c.ref).length===0);
   leaves.sort((a,b)=>(b.completedAt||0)-(a.completedAt||0));
@@ -851,7 +909,7 @@ function openLog(id,suggested){
   upd();inp.focus();
 }
 function closeLog(){document.getElementById('logOverlay').classList.remove('on');}
-function setStatus(id,s){const x=state.tasks.find(t=>t.id===id);if(!x)return;if(s==='done'){completeTask(id);return;}x.status=s;}
+function setStatus(id,s){const x=state.tasks.find(t=>t.id===id);if(!x)return;if(s==='done'){completeTask(id);return;}x.status=s;x.touchedAt=Date.now();}
 function editEst(id){const x=state.tasks.find(t=>t.id===id);if(!x)return;const v=prompt('Estimate in minutes for:\n\n'+x.title+'\n\n(numbers only \u2014 small first steps beat scary big ones)',x.est||'');if(v===null)return;const n=parseInt(v,10);x.est=isNaN(n)?null:n;render();}
 function parkIdea(text){if(!text.trim())return;state.parked.unshift({id:uid(),text:text.trim(),createdAt:Date.now()});toast('Parked. It\u2019s safe. <b>Eyes back on the prize.</b> &#128064;');}
 function promoteParked(pid){const i=state.parked.findIndex(p=>p.id===pid);if(i<0)return;const p=state.parked.splice(i,1)[0];state.tasks.push({id:uid(),title:p.text,status:'idea',est:null,parentId:null,url:null,pinned:false,firstStep:null,resumeLine:'',actualMinutes:null,domain:'work',ref:false,createdAt:Date.now(),completedAt:null});toast('Promoted to an Idea \u2014 it\u2019s on the board now.');view='all';syncTabs();}
@@ -876,6 +934,9 @@ board.addEventListener('click',e=>{
   else if(act==='ritual-keep'){state.meta.ritualDay=todayKey();render();toast('Locked. Go. &#127919;');}
   else if(act==='ritual-pick'){state.meta.ritualDay=todayKey();const old=state.tasks.find(t=>t.pinned);if(old)old.pinned=false;const p=pickTask();if(p){topOf(p).pinned=true;if(p.status!=='done')p.status='progress';render();openFocus(p.id);}else{render();toast('Nothing to pick \u2014 the board\u2019s clear. &#127881;');}}
   else if(act==='edit-resume'){editingResume=id;render();const i=document.querySelector('[data-resumeedit="'+id+'"]');if(i){i.focus();try{i.setSelectionRange(i.value.length,i.value.length);}catch(e){}}}
+  else if(act==='revealdone'){if(revealedDone.has(id))revealedDone.delete(id);else revealedDone.add(id);render();}
+  else if(act==='openreview'){openReview();}
+  else if(act==='review-dismiss'){reviewDismissed=true;render();toast('Cool \u2014 I\u2019ll keep it quiet. It\u2019s in the &#9776; menu whenever you want it.');}
 });
 board.addEventListener('change',e=>{const el=e.target.closest('[data-act="status"]');if(el){setStatus(el.dataset.id,el.value);render();}});
 board.addEventListener('keydown',e=>{
@@ -892,6 +953,10 @@ document.getElementById('focusCard').addEventListener('click',e=>{
   else if(act==='pip'){openPiP();}
   else if(act==='mute'){muted=!muted;lsSet(MUTE_KEY,muted?'1':'0');el.innerHTML=muted?'\ud83d\udd07':'\ud83d\udd0a';el.title=muted?'Sound off \u2014 tap to unmute':'Sound on \u2014 tap to mute';if(!muted){unlockAudio();playChime();}}
   else if(act==='ck'){checkpointMin=parseInt(el.dataset.min,10)||0;lsSet(CK_KEY,String(checkpointMin));const tot=timerElapsed+(timerInt?Math.floor((Date.now()-timerStart)/1000):0);ckCount=Math.floor(tot/((checkpointMin||999)*60));el.parentElement.querySelectorAll('.ckpill').forEach(p=>p.classList.toggle('on',p===el));toast(checkpointMin?('Check-ins every '+checkpointMin+' min.'):'Check-ins off \u2014 running on task time.');}
+  else if(act==='nudge'){nudgeOn=!nudgeOn;lsSet(NUDGE_KEY,nudgeOn?'1':'0');el.classList.toggle('on',nudgeOn);el.innerHTML='\ud83d\udc40 drift nudge: '+(nudgeOn?'on':'off');toast(nudgeOn?'I\u2019ll nudge the tab title if this sits idle 5 min with the clock stopped.':'Drift nudge off.');armIdle();}
+});
+document.getElementById('focusCard').addEventListener('keydown',e=>{
+  if(e.target.matches('[data-fpark]')&&e.key==='Enter'){e.preventDefault();const v=e.target.value.trim();if(v){parkIdea(v);scheduleSave();e.target.value='';}}
 });
 document.getElementById('overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeFocus();});
 document.getElementById('logCard').addEventListener('click',e=>{
@@ -935,6 +1000,15 @@ function saveWrapData(){
 function closeWrap(toastIt){saveWrapData();document.getElementById('wrapOverlay').classList.remove('on');render();if(toastIt)toast('Day wrapped. Resume notes set, tomorrow\u2019s teed up. Rest well. \ud83c\udf19');}
 document.getElementById('wrapCard').addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el)return;if(el.dataset.act==='wrapsave')closeWrap(true);else if(el.dataset.act==='wrapclose')closeWrap(false);});
 document.getElementById('wrapOverlay').addEventListener('click',e=>{if(e.target.id==='wrapOverlay')closeWrap(false);});
+document.getElementById('reviewCard').addEventListener('click',e=>{
+  const el=e.target.closest('[data-act]');if(!el)return;const act=el.dataset.act,id=el.dataset.id;
+  if(act==='closereview')closeReview();
+  else if(act==='rkeep')reviewKeep(id);
+  else if(act==='rdemote')reviewDemote(id);
+  else if(act==='rpark')reviewPark(id);
+  else if(act==='rdelete')reviewDelete(id);
+});
+document.getElementById('reviewOverlay').addEventListener('click',e=>{if(e.target.id==='reviewOverlay')closeReview();});
 document.getElementById('parkForm').addEventListener('submit',e=>{e.preventDefault();const inp=document.getElementById('parkInput');parkIdea(inp.value);inp.value='';render();});
 document.getElementById('pickBtn').onclick=openPick;
 document.getElementById('addBtn').onclick=()=>{addTask();render();};
@@ -946,9 +1020,9 @@ function syncTabs(){document.querySelectorAll('.tab').forEach(t=>t.classList.tog
 function renderMenu(){
   const m=document.getElementById('syncMenu');
   if(mode==='local'){
-    m.innerHTML=(fileHandle?'<button data-m="filesave">&#128196; Backup: '+escapeHtml(fileName)+' (change\u2026)</button>':'<button data-m="filesave">&#128190; Auto-save to a file\u2026</button>')+'<button data-m="fileopen">&#128194; Open a board file\u2026</button><div class="sep"></div><button data-m="backup">&#11015; Download a backup</button><button data-m="restore">&#11014; Load a backup\u2026</button><div class="sep"></div><button data-m="togithub">&#128279; Switch to GitHub sync</button>';
+    m.innerHTML='<button data-m="review">&#129529; Backlog review</button><div class="sep"></div>'+(fileHandle?'<button data-m="filesave">&#128196; Backup: '+escapeHtml(fileName)+' (change\u2026)</button>':'<button data-m="filesave">&#128190; Auto-save to a file\u2026</button>')+'<button data-m="fileopen">&#128194; Open a board file\u2026</button><div class="sep"></div><button data-m="backup">&#11015; Download a backup</button><button data-m="restore">&#11014; Load a backup\u2026</button><div class="sep"></div><button data-m="togithub">&#128279; Switch to GitHub sync</button>';
   }else{
-    m.innerHTML='<button data-m="refresh">&#8635; Refresh now</button><button data-m="backup">&#11015; Download a backup</button><div class="sep"></div><button data-m="disconnect" class="danger">&#9210; Disconnect this browser</button>';
+    m.innerHTML='<button data-m="review">&#129529; Backlog review</button><div class="sep"></div><button data-m="refresh">&#8635; Refresh now</button><button data-m="backup">&#11015; Download a backup</button><div class="sep"></div><button data-m="disconnect" class="danger">&#9210; Disconnect this browser</button>';
   }
 }
 document.getElementById('syncPill').addEventListener('click',()=>{renderMenu();document.getElementById('syncMenu').classList.toggle('on');});
@@ -957,6 +1031,7 @@ document.getElementById('syncMenu').addEventListener('click',async e=>{
   document.getElementById('syncMenu').classList.remove('on');
   const a=b.dataset.m;
   if(a==='refresh'){const ok=await pull();if(ok)render();}
+  else if(a==='review')openReview();
   else if(a==='disconnect')disconnect();
   else if(a==='filesave')pickSaveFile();
   else if(a==='fileopen')pickOpenFile();
@@ -1032,7 +1107,7 @@ function deleteTask(id){
 function timeAgo(ts){const d=(Date.now()-ts)/1000;if(d<60)return'just now';if(d<3600)return Math.floor(d/60)+'m ago';if(d<86400)return Math.floor(d/3600)+'h ago';return Math.floor(d/86400)+'d ago';}
 
 /* ===================== legend ===================== */
-document.getElementById('legend').innerHTML=SECTION_ORDER.map(s=>'<span><span class="dot '+s+'" style="width:10px;height:10px"></span>'+STATUS[s].short+'</span>').join('');
+document.getElementById('legend').innerHTML=SECTION_ORDER.map(s=>'<span><span class="dot '+s+'" style="width:10px;height:10px"></span>'+(s==='idea'?STATUS[s].short+' \u2728':STATUS[s].short)+'</span>').join('');
 
 /* ===================== boot ===================== */
 (async function(){
@@ -1058,6 +1133,10 @@ document.getElementById('legend').innerHTML=SECTION_ORDER.map(s=>'<span><span cl
   showChooser();
 })();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&token&&!dirty&&!saving&&!userIsTyping()){pull().then(ok=>{if(ok)render();});}});
+function sparkleBurst(){const cx=window.innerWidth/2,cy=window.innerHeight*0.4,gl=['\u2728','\ud83d\udcab','\u2b50','\ud83d\udd2e','\u2728'];for(let i=0;i<24;i++){const s=document.createElement('div');s.textContent=gl[i%gl.length];s.style.cssText='position:fixed;left:'+(cx+(Math.random()-.5)*150)+'px;top:'+cy+'px;font-size:'+(14+Math.random()*16)+'px;pointer-events:none;z-index:9999;will-change:transform,opacity';document.body.appendChild(s);s.animate([{transform:'translate(0,0) scale(.4)',opacity:0},{transform:'translate(0,-18px) scale(1)',opacity:1,offset:.15},{transform:'translate('+((Math.random()-.5)*240)+'px,'+(-190-Math.random()*220)+'px) scale(.7) rotate('+((Math.random()-.5)*240)+'deg)',opacity:0}],{duration:1500+Math.random()*900,easing:'cubic-bezier(.2,.6,.3,1)'});setTimeout(()=>s.remove(),2500);}}
+let _lt=[];const _logo=document.getElementById('logo');if(_logo)_logo.addEventListener('click',()=>{const n=Date.now();_lt.push(n);_lt=_lt.filter(t=>n-t<1500);if(_lt.length>=3){_lt=[];sparkleBurst();if(!muted){try{playChime();}catch(e){}}toast('\u2728 You found it. You built the thing that keeps you on the thing \u2014 the exact opposite of a rabbit hole. Proud of you. \ud83d\udc9c');}});
+console.log('%c\u2728 Tempo','font-size:22px;font-weight:800;color:#c77dff;text-shadow:0 0 8px rgba(199,125,255,.55)');
+console.log('%cOne thing at a time. Keep the pace. \u2014 built for the way your brain actually works.','color:#8a94a6;font-size:12px');
 </script>
 </body>
 </html>

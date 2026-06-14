@@ -6,29 +6,17 @@ possible improvements. Pull the highest-value item here before starting anything
 
 ## Planned
 
-1. **Clock continuity across sessions.**
-   A task worked across several sittings should accumulate total time rather than
-   only the most recent sitting, so the time-estimate accuracy stats stay correct.
-   Small change.
+1. **Active-task reminders (system notifications).**
+   Optional OS-level notification while a focus session is running, to resurface the
+   current task even when the tab is hidden. Requires notification permission.
+   v9 ships an in-app, tab-title-only version of this (off by default); a true
+   system-notification version is the next step up. Small–moderate.
 
-2. **Local-only mode + export / import.**
-   Make GitHub sync optional so the app can run with no account on a single device
-   (state persisted to `localStorage`). Add board export/import for backup and for
-   moving between devices. Also closes a durability gap where unsynced edits are
-   currently lost on refresh. Moderate.
-
-3. **Active-task reminders.**
-   Optional periodic notification while a focus session is running, to resurface the
-   current task. Requires notification permission. Small–moderate.
-
-4. **Auto-pause timer on tab blur.**
+2. **Auto-pause timer on tab blur.**
    Pause the focus clock when the tab loses focus so background time isn't counted.
-   Open decision: pause immediately vs. after a short delay (immediate can undercount
-   when referencing material in another tab).
-
-5. **Review mode.**
-   A guided pass over older items — keep / defer / remove — in one sweep. Polish;
-   the manual habit works fine in the meantime.
+   Held: pausing immediately undercounts when referencing material in another app —
+   which is a normal heads-down workflow here — so this stays parked until there's a
+   reliable "actually away" vs. "looking something up" signal.
 
 ## Decisions
 
@@ -54,12 +42,29 @@ possible improvements. Pull the highest-value item here before starting anything
 - **v7** — Local mode: first-run chooser, in-browser storage, autosave-to-file
   (point it at a cloud-drive folder), backup download/restore, starter board
   generator, restore path from the welcome screen.
-- **v8 (final cut)** — Focus shows exactly one task: progress bar, pending steps
+- **v8** — Focus shows exactly one task: progress bar, pending steps
   only (done ones clear), obvious Start button. All view grouped by life area;
   filter chips removed (color = status only). New-day "still the ONE?" ritual.
   Open-loops nudge when too much is in progress.
+- **v9 (final cut)** — *Protect the clock, stop losing things.*
+  - **Clock continuity across sittings** — a task accumulates total focused time
+    across reopens instead of resetting, so estimate-accuracy stays honest.
+  - **Park-in-focus** — capture a stray thought to the parking lot mid-session
+    without stopping the clock or leaving the task.
+  - **Guided backlog review** — a one-sweep pass over items untouched for 2+ weeks:
+    keep / demote / park / delete each, with a "next" list cap reminder. Surfaces
+    proactively when items go stale; also in the menu. (Staleness clock starts at
+    v9 adoption — it won't retroactively flag the whole backlog.)
+  - **Blocked / Waiting-on status** — a real bucket for can't-act-yet work.
+  - **Lighter All view** — empty resume prompts hidden until a card is expanded;
+    completed sub-tasks collapse behind a "N done · show" toggle.
+  - **Opt-in drift nudge** — off by default; if a focus session sits idle with the
+    clock stopped, the browser-tab title gives a quiet nudge.
+  - **Estimate framing** — calibration is now a neutral planning factor, not an
+    "% OVER" grade; the focus disk fills toward the target instead of draining,
+    and passing the estimate reads calm, not alarming.
 
 ## Status: FROZEN
 
-v8 is the stable build. The board's job now is to be used, not improved.
+v9 is the stable build. The board's job now is to be used, not improved.
 New ideas land here as one-liners and wait for a scheduled review.
