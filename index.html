@@ -322,7 +322,7 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
 
     <div class="tabrow">
     <div class="tabs" id="tabs">
-      <button class="tab on" data-view="focus">Now <span class="c" id="cFocus"></span></button>
+      <button class="tab on" data-view="focus">Focus <span class="c" id="cFocus"></span></button>
       <button class="tab" data-view="all">All <span class="c" id="cAll"></span></button>
       <button class="tab" data-view="parked">Parked <span class="c" id="cParked"></span></button>
     </div>
@@ -334,7 +334,7 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
     <div class="legend" id="legend"></div>
   </div>
 
-  <div class="foot">Tempo &middot; one thing at a time &middot; <b style="color:var(--accent)">build v10 &middot; frozen</b></div>
+  <div class="foot">Tempo &middot; one thing at a time &middot; <b style="color:var(--accent)">build v11</b></div>
 </div>
 
 <div class="overlay" id="overlay"><div class="focus" id="focusCard"></div></div>
@@ -648,7 +648,7 @@ function renderFilter(){
 function taskHTML(x,isSub){
   const kid=kids(x.id),prog=subProgress(x),est=rollupEst(x),isDone=x.status==='done',hasKids=kid.length>0;
   const onFocusChain=(x.status==='progress')||hasProgressDescendant(x);
-  const isOpen=state.ui.open[x.id]||(FOCUSMODE&&hasProgressDescendant(x));
+  const isOpen=state.ui.open[x.id]||(FOCUSMODE&&!isSub&&(x.status==='progress'||hasProgressDescendant(x)));
   const dimmed=isSub&&x.status!=='progress'&&!hasProgressDescendant(x);
   let meta='';
   if(prog)meta+='<span class="progwrap"><span class="ring" style="--p:'+prog.pct+'"></span><span class="subcount">'+prog.done+'/'+prog.total+' done</span></span>';
@@ -674,9 +674,9 @@ function taskHTML(x,isSub){
   if(!x.ref&&!isDone)meta+='<span class="chip gofocus" data-act="focus" data-id="'+x.id+'" title="Focus this &mdash; start the timer">&#9654;</span>';
   let resumeBlock='';
   if(x.status==='progress'&&!x.ref){
-    if(editingResume===x.id)resumeBlock='<div class="resume editing"><input class="resume-input" data-resumeedit="'+x.id+'" value="'+escapeHtml(x.resumeLine||'')+'" placeholder="next physical action \u2014 the exact thing to do first"></div>';
+    if(editingResume===x.id)resumeBlock='<div class="resume editing"><input class="resume-input" data-resumeedit="'+x.id+'" value="'+escapeHtml(x.resumeLine||'')+'" placeholder="resume here \u2014 the exact next action"></div>';
     else if(x.resumeLine)resumeBlock='<div class="resume" data-act="edit-resume" data-id="'+x.id+'" title="Click to edit your resume note">&#8592; '+escapeHtml(x.resumeLine)+'</div>';
-    else if(isOpen)resumeBlock='<div class="resume muted" data-act="edit-resume" data-id="'+x.id+'">&#8592; add a resume note</div>';
+    else if(isOpen)resumeBlock='<div class="resume muted" data-act="edit-resume" data-id="'+x.id+'">&#8592; resume here</div>';
   }
   return '<div class="task '+(isSub?'sub':'')+' '+(dimmed?'dim':'')+' '+(isDone?'isdone':'')+' '+(x.pinned?'pinned':'')+' '+(isOpen?'open':'')+'" data-id="'+x.id+'">'+
     (!x.ref?'<div class="check '+(isDone?'on':'')+'" data-act="check" data-id="'+x.id+'" title="Mark done"></div>':'<div style="width:19px;flex:none"></div>')+
@@ -710,33 +710,18 @@ function reviewBanner(){const n=staleList().length;if(!n||reviewDismissed)return
 function renderFocusView(){
   const items=focusTops();
   const lane=domainFilter==='all'?'':' in '+DOMAINS[domainFilter];
+  const banner=reviewBanner();
   if(!items.length){
-    board.innerHTML='<div class="empty"><div class="big">Nothing in progress'+escapeHtml(lane)+'.</div><p>Set something to <b>In progress</b> in All, or let me pick one to start.</p><button class="btn primary" id="pickEmpty">&#127919; Pick one for me</button></div>';
+    board.innerHTML=banner+'<div class="empty"><div class="big">Nothing in progress'+escapeHtml(lane)+'.</div><p>Set something to <b>In progress</b> in All, or let me pick one to start.</p><button class="btn primary" id="pickEmpty">&#127919; Pick one for me</button></div>';
     document.getElementById('pickEmpty').onclick=openPick;return;
   }
-  let html='<div class="nowhead">'+items.length+' in progress'+escapeHtml(lane)+' &middot; tap one to focus it</div>';
-  for(const x of items){
-    const real=kids(x.id).filter(c=>!c.ref);
-    const pend=real.filter(c=>c.status!=='done');
-    const done=real.length-pend.length;
-    let subs='';
-    if(real.length){
-      const pct=Math.round(done/real.length*100);
-      subs='<div class="fprog"><div class="fbar"><i style="width:'+pct+'%"></i></div><span>'+done+' of '+real.length+' done &middot; '+pend.length+' to go</span></div>';
-    }
-    let resume='';
-    if(editingResume===x.id)resume='<div class="resume editing"><input class="resume-input" data-resumeedit="'+x.id+'" value="'+escapeHtml(x.resumeLine||'')+'" placeholder="where you were \u2014 the exact next action"></div>';
-    else if(x.resumeLine)resume='<div class="resume" data-act="edit-resume" data-id="'+x.id+'" title="Click to edit">&#8592; '+escapeHtml(x.resumeLine)+'</div>';
-    else resume='<div class="resume muted" data-act="edit-resume" data-id="'+x.id+'">&#8592; add a \u201cwhere I was\u201d note</div>';
-    html+='<div class="nowcard" data-id="'+x.id+'">'+
-      '<div class="nowtop"><span class="dot '+x.status+'" style="width:10px;height:10px;flex:none"></span>'+
-        '<div class="nowttl">'+escapeHtml(x.title)+'</div>'+
-        '<span class="chip dom" data-act="domain" data-id="'+x.id+'" title="Life area">'+DOMAINS[x.domain]+'</span></div>'+
-      resume+subs+
-      '<button class="btn primary nowfocus" data-act="focus" data-id="'+x.id+'">&#9654;&nbsp; Focus this</button>'+
-    '</div>';
-  }
-  board.innerHTML=html;
+  FOCUSMODE=true;
+  const body=items.map(x=>taskHTML(x,false)).join('');
+  FOCUSMODE=false;
+  board.innerHTML=banner+
+    '<div class="nowhead">'+items.length+' in progress'+escapeHtml(lane)+' &middot; the active chunk is lit, the rest are dimmed</div>'+
+    '<div class="section"><div class="slist">'+body+'</div></div>'+
+    '<div class="empty" style="padding:18px"><p style="margin:0">That\u2019s the whole live list. Everything else is one tab away &mdash; not this minute\u2019s problem.</p></div>';
 }
 function renderAllView(){
   let html='';
