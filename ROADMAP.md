@@ -66,5 +66,16 @@ possible improvements. Pull the highest-value item here before starting anything
 
 ## Status: FROZEN
 
-v9 is the stable build. The board's job now is to be used, not improved.
+v10 is the stable build. The board's job now is to be used, not improved.
 New ideas land here as one-liners and wait for a scheduled review.
+
+## Shipped (most recent first)
+
+- **v10 (course-correction)** — *Unbreak the focus model.* v8/v9 had wrongly assumed
+  one global "in-progress" task and a clock that raced the project estimate. Reverted
+  to: a **Work / Fun / Growth filter** (multiple things in progress at once, switch lanes
+  with one tap, no status resets); a **Now** view that simply lists your in-progress
+  projects in the active lane; and a **check-in / time-timer** focus clock (cycles per
+  interval, default 25 min) decoupled from estimates. Added **rename-in-place** and
+  **promote-sub-task-to-project** (one level of nesting going forward). Removed the
+  forced "the one" pin + daily ritual, the on-ramp note, and the drift nudge.
