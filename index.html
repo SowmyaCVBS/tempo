@@ -232,6 +232,12 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
 .subdone-note:hover{color:var(--muted)}
 .rbanner{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.32);border-radius:12px;padding:11px 14px;font-size:13.5px;margin-bottom:12px;animation:rise .4s ease both}
 .rbanner .rbtns{margin-left:auto;display:flex;gap:7px}
+.obanner{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(110,168,255,.08);border:1px solid rgba(110,168,255,.3);border-radius:12px;padding:10px 14px;font-size:13.5px;margin-bottom:12px;animation:rise .4s ease both}
+.obanner .ob-k{font-family:var(--mono);font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--accent);flex:none}
+.obanner .ob-b{font-weight:700;color:var(--txt)}
+.obanner .ob-t{color:var(--muted)}
+.obanner .ob-x{margin-left:auto;background:none;border:none;color:var(--muted-2);font-size:18px;line-height:1;cursor:pointer;padding:0 2px}
+.obanner .ob-x:hover{color:var(--txt)}
 .rlist{display:flex;flex-direction:column;gap:8px;margin:4px 0 16px;max-height:48vh;overflow:auto}
 .rrow{display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--line-soft);border-radius:11px;padding:9px 12px;flex-wrap:wrap}
 .rmain{flex:1;min-width:170px;font-size:13.5px;line-height:1.35}
@@ -334,7 +340,7 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
     <div class="legend" id="legend"></div>
   </div>
 
-  <div class="foot">Tempo &middot; one thing at a time &middot; <b style="color:var(--accent)">build v11</b></div>
+  <div class="foot">Tempo &middot; one thing at a time &middot; <b style="color:var(--accent)">build v12</b></div>
 </div>
 
 <div class="overlay" id="overlay"><div class="focus" id="focusCard"></div></div>
@@ -465,6 +471,17 @@ function normalize(o){
   if(typeof s.meta.doneToday!=='number')s.meta.doneToday=0;
   if(!s.meta.doneDate)s.meta.doneDate=todayKey();
   s.tasks=s.tasks.map(t=>{const o=Object.assign({est:null,parentId:null,url:null,pinned:false,firstStep:null,resumeLine:'',actualMinutes:null,domain:'work',ref:false,createdAt:Date.now(),completedAt:null,status:'team',title:'(untitled)',focusedSeconds:0,touchedAt:null},t);if(!o.touchedAt)o.touchedAt=Date.now();return o;});
+  // migrate to max 2 levels: any non-top task that itself has children is promoted to a top-level project (inherits its old top ancestor's lane)
+  {const hasChild=id=>s.tasks.some(c=>c.parentId===id);let changed=true,guard=0;
+    while(changed&&guard++<60){changed=false;
+      for(const t of s.tasks){
+        if(t.parentId!==null&&hasChild(t.id)){
+          let a=t,seen=new Set();while(a&&a.parentId&&!seen.has(a.id)){seen.add(a.id);const p=s.tasks.find(x=>x.id===a.parentId);if(!p)break;a=p;}
+          t.domain=(a&&a.domain)||t.domain||'work';t.parentId=null;changed=true;
+        }
+      }
+    }
+  }
   return s;
 }
 
@@ -645,7 +662,7 @@ function renderFilter(){
   const opts=[['all','All areas'],['work','Work'],['fun','Fun'],['growth','Growth']];
   el.innerHTML=opts.map(o=>'<button class="dpill'+(domainFilter===o[0]?' on':'')+'" data-dom="'+o[0]+'">'+o[1]+'</button>').join('');
 }
-function taskHTML(x,isSub){
+function taskHTML(x,isSub,lite){
   const kid=kids(x.id),prog=subProgress(x),est=rollupEst(x),isDone=x.status==='done',hasKids=kid.length>0;
   const onFocusChain=(x.status==='progress')||hasProgressDescendant(x);
   const isOpen=state.ui.open[x.id]||(FOCUSMODE&&!isSub&&(x.status==='progress'||hasProgressDescendant(x)));
@@ -672,6 +689,7 @@ function taskHTML(x,isSub){
   if(!x.ref)meta+='<span class="chip" data-act="edit-title" data-id="'+x.id+'" title="Rename">&#9998;</span>';
   if(!x.ref)meta+='<span class="chip del" data-act="del" data-id="'+x.id+'" title="Delete this task">&#128465;</span>';
   if(!x.ref&&!isDone)meta+='<span class="chip gofocus" data-act="focus" data-id="'+x.id+'" title="Focus this &mdash; start the timer">&#9654;</span>';
+  if(lite)meta=(!x.ref&&!isDone)?'<span class="chip gofocus" data-act="focus" data-id="'+x.id+'" title="Focus this &mdash; start the timer">&#9654;</span>':'';
   let resumeBlock='';
   if(x.status==='progress'&&!x.ref){
     if(editingResume===x.id)resumeBlock='<div class="resume editing"><input class="resume-input" data-resumeedit="'+x.id+'" value="'+escapeHtml(x.resumeLine||'')+'" placeholder="resume here \u2014 the exact next action"></div>';
@@ -683,18 +701,20 @@ function taskHTML(x,isSub){
     '<div class="tmain"><div class="ttl"><span class="dot '+x.status+'" style="width:9px;height:9px;vertical-align:middle;margin-right:7px"></span>'+(editingTitle===x.id?'<input class="title-input" data-titleedit="'+x.id+'" value="'+escapeHtml(x.title)+'">':escapeHtml(x.title))+'</div>'+
     resumeBlock+
     '<div class="tmeta">'+meta+'</div></div>'+
-    '<div class="expand"><span class="caret" data-act="toggle" data-id="'+x.id+'">'+(hasKids?'&#9660;':'&#43;')+'</span></div></div>'+
-    (isOpen?renderChildren(x.id):'');
+    (lite?'<div class="expand"></div>':'<div class="expand"><span class="caret" data-act="toggle" data-id="'+x.id+'">'+(hasKids?'&#9660;':'&#43;')+'</span></div>')+'</div>'+
+    (isOpen?renderChildren(x.id,lite):'');
 }
 const revealedDone=new Set();
-function renderChildren(pid){
+function renderChildren(pid,lite){
   const parent=state.tasks.find(t=>t.id===pid);
-  const all=kids(pid), show=revealedDone.has(pid);
+  const all=kids(pid), show=!lite&&revealedDone.has(pid);
   const live=show?all:all.filter(c=>c.status!=='done');
-  let html=live.map(c=>taskHTML(c,true)).join('');
-  const doneN=all.filter(c=>c.status==='done').length;
-  if(doneN)html+='<div class="subdone-note" data-act="revealdone" data-id="'+pid+'">'+(show?'&#10003; hide '+doneN+' done':'&#10003; '+doneN+' done &middot; show')+'</div>';
-  if(parent&&parent.parentId===null)html+='<div class="addrow"><input data-addsub="'+pid+'" placeholder="+ add a sub-task to break this down&hellip; (Enter)"></div>';
+  let html=live.map(c=>taskHTML(c,true,lite)).join('');
+  if(!lite){
+    const doneN=all.filter(c=>c.status==='done').length;
+    if(doneN)html+='<div class="subdone-note" data-act="revealdone" data-id="'+pid+'">'+(show?'&#10003; hide '+doneN+' done':'&#10003; '+doneN+' done &middot; show')+'</div>';
+    if(parent&&parent.parentId===null)html+='<div class="addrow"><input data-addsub="'+pid+'" placeholder="+ add a sub-task to break this down&hellip; (Enter)"></div>';
+  }
   return '<div class="children">'+html+'</div>';
 }
 function hasProgressDescendant(x){return kids(x.id).some(c=>!c.ref&&(c.status==='progress'||hasProgressDescendant(c)));}
@@ -707,21 +727,24 @@ function ritualHTML(){
   return '<div class="ritual">&#127749; New day. Pick today&rsquo;s ONE before the inbox picks it for you.<span class="rbtns"><button class="btn sm" data-act="ritual-pick">&#127919; Pick one for me</button></span></div>';
 }
 function reviewBanner(){const n=staleList().length;if(!n||reviewDismissed)return '';return '<div class="rbanner">&#129529; '+n+(n>1?' items have':' item has')+' sat untouched 2+ weeks. A 2-min prune keeps the board honest.<span class="rbtns"><button class="btn sm" data-act="openreview">Review</button><button class="btn sm ghost" data-act="review-dismiss">Not now</button></span></div>';}
+function onrampBanner(){
+  const id=state.meta&&state.meta.onrampId;if(!id)return '';
+  const t=state.tasks.find(x=>x.id===id);
+  if(!t||t.status==='done'||!t.firstStep){if(state.meta)state.meta.onrampId=null;return '';}
+  return '<div class="obanner"><span class="ob-k">&#9654; first move</span><span class="ob-b">'+escapeHtml(t.title)+'</span><span class="ob-t">'+escapeHtml(t.firstStep)+'</span><button class="ob-x" data-act="onramp-clear" title="Clear tomorrow\u2019s first move">&times;</button></div>';
+}
 function renderFocusView(){
   const items=focusTops();
   const lane=domainFilter==='all'?'':' in '+DOMAINS[domainFilter];
-  const banner=reviewBanner();
+  const top=reviewBanner()+onrampBanner();
   if(!items.length){
-    board.innerHTML=banner+'<div class="empty"><div class="big">Nothing in progress'+escapeHtml(lane)+'.</div><p>Set something to <b>In progress</b> in All, or let me pick one to start.</p><button class="btn primary" id="pickEmpty">&#127919; Pick one for me</button></div>';
+    board.innerHTML=top+'<div class="empty"><div class="big">Nothing in progress'+escapeHtml(lane)+'.</div><p>Set something to <b>In progress</b> in All, or let me pick one to start.</p><button class="btn primary" id="pickEmpty">&#127919; Pick one for me</button></div>';
     document.getElementById('pickEmpty').onclick=openPick;return;
   }
   FOCUSMODE=true;
-  const body=items.map(x=>taskHTML(x,false)).join('');
+  const body=items.map(x=>taskHTML(x,false,true)).join('');
   FOCUSMODE=false;
-  board.innerHTML=banner+
-    '<div class="nowhead">'+items.length+' in progress'+escapeHtml(lane)+' &middot; the active chunk is lit, the rest are dimmed</div>'+
-    '<div class="section"><div class="slist">'+body+'</div></div>'+
-    '<div class="empty" style="padding:18px"><p style="margin:0">That\u2019s the whole live list. Everything else is one tab away &mdash; not this minute\u2019s problem.</p></div>';
+  board.innerHTML=top+'<div class="section"><div class="slist">'+body+'</div></div>';
 }
 function renderAllView(){
   let html='';
@@ -943,6 +966,7 @@ board.addEventListener('click',e=>{
   else if(act==='revealdone'){if(revealedDone.has(id))revealedDone.delete(id);else revealedDone.add(id);render();}
   else if(act==='openreview'){openReview();}
   else if(act==='review-dismiss'){reviewDismissed=true;render();toast('Cool \u2014 I\u2019ll keep it quiet. It\u2019s in the &#9776; menu whenever you want it.');}
+  else if(act==='onramp-clear'){if(state.meta)state.meta.onrampId=null;render();}
 });
 board.addEventListener('change',e=>{const el=e.target.closest('[data-act="status"]');if(el){setStatus(el.dataset.id,el.value);render();}});
 board.addEventListener('keydown',e=>{
@@ -989,9 +1013,14 @@ function openWrap(){
   const resumeSec=inProg.length
     ? inProg.map(t=>'<label class="wrap-l">&#8592; Resume note for <b>'+escapeHtml(t.title)+'</b></label><input class="wrap-input" data-wrap-resume="'+t.id+'" value="'+escapeHtml(t.resumeLine||'')+'" placeholder="the exact next physical action">').join('')
     : '<div class="wrap-note">Nothing in progress \u2014 clean slate for the morning.</div>';
-  const nextSec=nextTop
-    ? '<label class="wrap-l">On-ramp for <b>'+escapeHtml(nextTop.title)+'</b> <span class="muted2">(top next-priority)</span></label><input class="wrap-input" data-wrap-onramp="'+nextTop.id+'" value="'+escapeHtml(nextTop.firstStep||'')+'" placeholder="smallest first move \u2014 e.g. open the repo, read X, 15 min">'
-    : '<div class="wrap-note">No <b>Next priority</b> task yet \u2014 flip one so morning-you has a clear start.</div>';
+  const cands=state.tasks.filter(t=>!t.ref&&t.status!=='done');
+  const inP=cands.filter(t=>t.status==='progress'), oth=cands.filter(t=>t.status!=='progress');
+  const og=(lab,arr)=>arr.length?'<optgroup label="'+lab+'">'+arr.map(t=>'<option value="'+t.id+'">'+escapeHtml(t.title)+'</option>').join('')+'</optgroup>':'';
+  const pickId=(state.meta&&state.meta.onrampId&&cands.some(t=>t.id===state.meta.onrampId))?state.meta.onrampId:((inP[0]||oth[0]||{}).id||'');
+  const pickT=state.tasks.find(t=>t.id===pickId);
+  const nextSec=cands.length
+    ? '<label class="wrap-l">Pick tomorrow\u2019s first task &mdash; then its smallest first move</label><select class="wrap-input" id="wrapOnrampSel">'+og('In progress',inP)+og('Everything else',oth)+'</select><input class="wrap-input" id="wrapOnrampInp" data-wrap-onramp="'+pickId+'" value="'+escapeHtml((pickT&&pickT.firstStep)||'')+'" placeholder="smallest first move \u2014 e.g. open the repo, read X, 15 min">'
+    : '<div class="wrap-note">No tasks yet \u2014 add one so morning-you has a clear start.</div>';
   document.getElementById('wrapCard').innerHTML=
     '<button class="xclose" data-act="wrapclose">&times;</button>'+
     '<div class="kicker">&#127769; wrap the day</div>'+
@@ -1001,11 +1030,13 @@ function openWrap(){
     '<div class="wrap-sec"><div class="wrap-h">Tomorrow\u2019s first move</div>'+nextSec+'</div>'+
     '<div class="fbtns"><button class="btn primary" data-act="wrapsave">Done \u2014 see you tomorrow</button></div>';
   document.getElementById('wrapOverlay').classList.add('on');
+  const osel=document.getElementById('wrapOnrampSel'),oinp=document.getElementById('wrapOnrampInp');
+  if(osel&&oinp){osel.value=oinp.dataset.wrapOnramp||'';osel.onchange=()=>{const t=state.tasks.find(x=>x.id===osel.value);oinp.dataset.wrapOnramp=osel.value;oinp.value=(t&&t.firstStep)||'';oinp.focus();};}
   const f=document.querySelector('#wrapCard input');if(f)f.focus();
 }
 function saveWrapData(){
   document.querySelectorAll('#wrapCard [data-wrap-resume]').forEach(i=>{const t=state.tasks.find(t=>t.id===i.dataset.wrapResume);if(t)t.resumeLine=i.value.trim();});
-  document.querySelectorAll('#wrapCard [data-wrap-onramp]').forEach(i=>{const t=state.tasks.find(t=>t.id===i.dataset.wrapOnramp);if(t)t.firstStep=i.value.trim()||null;});
+  const oi=document.querySelector('#wrapCard [data-wrap-onramp]');if(oi){const t=state.tasks.find(t=>t.id===oi.dataset.wrapOnramp);if(t){t.firstStep=oi.value.trim()||null;state.meta.onrampId=t.firstStep?t.id:null;}}
 }
 function closeWrap(toastIt){saveWrapData();document.getElementById('wrapOverlay').classList.remove('on');render();if(toastIt)toast('Day wrapped. Resume notes set, tomorrow\u2019s teed up. Rest well. \ud83c\udf19');}
 document.getElementById('wrapCard').addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el)return;if(el.dataset.act==='wrapsave')closeWrap(true);else if(el.dataset.act==='wrapclose')closeWrap(false);});
