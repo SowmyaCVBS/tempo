@@ -340,7 +340,7 @@ select.statussel{font-family:var(--mono);font-size:11px;background:var(--panel-2
     <div class="legend" id="legend"></div>
   </div>
 
-  <div class="foot">Tempo &middot; one thing at a time &middot; <b style="color:var(--accent)">build v12</b></div>
+  <div class="foot">Tempo &middot; one thing at a time &middot; <b style="color:var(--accent)">build v13</b></div>
 </div>
 
 <div class="overlay" id="overlay"><div class="focus" id="focusCard"></div></div>
@@ -419,7 +419,8 @@ const GH={
 };
 
 let token=null, state=null, remoteSha=null, dirty=false, saving=false, pollTimer=null;
-let tokenExpiry=null, authFailed=false;
+// authFailed (HTTP status of the last 401/403, else 0) is the one source for "sync is down"; badge and banner both read it.
+let tokenExpiry=null, authFailed=0, syncErr=null;
 let mode=lsGet(MODE_KEY)||null, fileHandle=null, fileName='', needFsReconnect=false, fileTimer=null;
 function isoDay(ms){const d=new Date(ms);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function tokenDaysLeft(){if(!tokenExpiry)return null;return Math.ceil((tokenExpiry-Date.now())/86400000);}
@@ -499,6 +500,7 @@ function b64decode(b64){
 
 /* ===================== GitHub API ===================== */
 function captureExp(r){
+  // api.github.com doesn't CORS-expose this header today, so the typed expiry date is advisory only.
   try{
     const h=r.headers.get('GitHub-Authentication-Token-Expiration');
     if(!h)return;
@@ -530,13 +532,25 @@ async function ghPut(jsonStr,sha){
 }
 
 /* ===================== sync ===================== */
-function setSync(stt){
+function setSync(stt,err){
   const pill=document.getElementById('syncPill'),txt=document.getElementById('syncTxt');
   pill.classList.remove('ok','busy','bad');
   const map={saved:['ok','Synced'],saving:['busy','Saving\u2026'],syncing:['busy','Syncing\u2026'],offline:['bad','Offline'],autherr:['bad','Reconnect'],local:['ok','On this device'],localfile:['ok','Saved \u00b7 file'],idle:['','\u2026']};
   const m=map[stt]||map.idle; if(m[0])pill.classList.add(m[0]); txt.textContent=m[1];
-  if(stt==='autherr')authFailed=true; else if(stt==='saved')authFailed=false;
+  if(err)syncErr=err;
+  if(stt==='autherr')authFailed=(err&&err.status)||401;
+  else if(stt==='saved'){authFailed=0;dropStaleExpiry();}
   updateBanner();
+}
+// GitHub just accepted the token, so a stored expiry already in the past is wrong.
+function dropStaleExpiry(){if(tokenExpiry!==null&&tokenExpiry<=Date.now()){tokenExpiry=null;lsDel(EXP_KEY);}}
+function syncErrMsg(e){
+  const s=e&&e.status, where=GH.owner+'/'+GH.repo;
+  if(s===401)return 'GitHub rejected this token (HTTP 401): it is expired, revoked, or mistyped. Generate a new one.';
+  if(s===403)return 'GitHub rejected this token for '+where+' (HTTP 403): it needs Contents read/write on that repo.';
+  if(s===404)return 'Not found (HTTP 404): this token can\u2019t see '+where+'. Check the repo name and the token\u2019s repository access.';
+  if(s)return 'GitHub returned HTTP '+s+' for '+where+'. Try again in a minute.';
+  return 'Couldn\u2019t reach GitHub (network error). Check your connection and try again.';
 }
 function updateBanner(){
   const el=document.getElementById('expBanner'); if(!el)return;
@@ -551,10 +565,10 @@ function updateBanner(){
   }
   if(!token){el.style.display='none';return;}
   const d=tokenDaysLeft(); let kind=null,msg='';
-  if(authFailed||(d!==null&&d<=0)){
+  if(authFailed){
     kind='bad';
-    msg='<b>Sync is down.</b> Your token has expired or been revoked, so edits are saving in <b>this browser only</b>. Reconnect with a fresh token now so nothing is lost.';
-  }else if(d!==null&&d<=7){
+    msg='<b>Sync is down.</b> GitHub rejected your token (HTTP '+authFailed+'), so edits since then are only in <b>this tab</b>. Reconnect with a fresh token now so nothing is lost.';
+  }else if(d!==null&&d>0&&d<=7){
     kind='warn';
     msg='<b>Your sync token expires in '+d+' day'+(d===1?'':'s')+'</b> (on '+new Date(tokenExpiry).toLocaleDateString(undefined,{month:'short',day:'numeric'})+'). Replace it before then and syncing never skips a beat.';
   }
@@ -569,9 +583,13 @@ async function pull(){
   setSync('syncing');
   try{
     const res=await ghGet();
-    if(res.missing){state=emptySeed();remoteSha=null;await commit(true);return true;}
+    if(res.missing){ // seed only if the write lands; a 404 can also mean the token can't see the repo
+      const prev=state;state=emptySeed();remoteSha=null;
+      if(await commit(true))return true;
+      state=prev;return false;
+    }
     state=normalize(JSON.parse(res.content));remoteSha=res.sha;setSync('saved');return true;
-  }catch(e){setSync(e&&e.auth?'autherr':'offline');return false;}
+  }catch(e){setSync(e&&e.auth?'autherr':'offline',e||{});return false;}
 }
 let saveTimer=null;
 function serializeStr(){return JSON.stringify(serialize(state),null,1);}
@@ -607,8 +625,8 @@ async function commit(initial){
       if(e.conflict){const cur=await ghGet();remoteSha=cur.missing?null:cur.sha;newSha=await ghPut(payload,remoteSha);}
       else throw e;
     }
-    remoteSha=newSha;dirty=false;setSync('saved');
-  }catch(e){setSync(e&&e.auth?'autherr':'offline');}
+    remoteSha=newSha;dirty=false;setSync('saved');return true;
+  }catch(e){setSync(e&&e.auth?'autherr':'offline',e||{});return false;}
   finally{saving=false;}
 }
 function startPolling(){
@@ -619,11 +637,12 @@ function startPolling(){
     try{
       const res=await ghGet();
       if(res.missing)return;
+      setSync('saved');
       if(res.sha!==remoteSha){
         remoteSha=res.sha;state=normalize(JSON.parse(res.content));render();
         toast('Pulled the latest from your other session. \ud83d\udd04');
       }
-    }catch(e){}
+    }catch(e){setSync(e&&e.auth?'autherr':'offline',e||{});}
   },30000);
 }
 
@@ -1090,8 +1109,8 @@ function showConnect(){
   document.getElementById('ownerInput').value=GH.owner;
   document.getElementById('repoInput').value=GH.repo;
   document.getElementById('branchInput').value=GH.branch;
-  const se=lsGet(EXP_KEY);
-  document.getElementById('expInput').value=se?isoDay(Date.parse(se)):isoDay(Date.now()+30*864e5);
+  // The date describes the token about to be pasted, so the previous token's date never carries over.
+  document.getElementById('expInput').value=isoDay(Date.now()+30*864e5);
   setSync('idle');
 }
 function hideConnect(){document.getElementById('connectOverlay').classList.remove('on');document.getElementById('mainUI').classList.remove('hidden');}
@@ -1105,14 +1124,14 @@ async function doConnect(){
   lsSet('tempo-gh-owner',GH.owner);lsSet('tempo-gh-repo',GH.repo);lsSet('tempo-gh-branch',GH.branch);
   token=v;err.textContent='';setSync('syncing');
   const expVal=document.getElementById('expInput').value;
-  if(expVal){const t=Date.parse(expVal+'T23:59:59');if(!isNaN(t)){tokenExpiry=t;lsSet(EXP_KEY,new Date(t).toISOString());}}
+  const t=expVal?Date.parse(expVal+'T23:59:59'):NaN; tokenExpiry=isNaN(t)?null:t;
   const btn=document.getElementById('connectBtn');btn.disabled=true;
-  const ok=await pull();
+  const ok=await pull(); // on success, setSync('saved') has already dropped a past date
   btn.disabled=false;
-  if(ok){lsSet(TOKEN_KEY,v);hideConnect();render();startPolling();toast('Connected. Your board is live. &#128279;');}
-  else{token=null;err.textContent='Couldn\u2019t connect. Check: repo exists, token has Contents read/write on '+GH.owner+'/'+GH.repo+', and board.json was uploaded.';}
+  if(ok){lsSet(TOKEN_KEY,v);if(tokenExpiry)lsSet(EXP_KEY,new Date(tokenExpiry).toISOString());else lsDel(EXP_KEY);hideConnect();render();startPolling();toast('Connected. Your board is live. &#128279;');}
+  else{token=null;err.textContent='Couldn\u2019t connect. '+syncErrMsg(syncErr);}
 }
-function disconnect(){lsDel(TOKEN_KEY);lsDel(EXP_KEY);token=null;tokenExpiry=null;authFailed=false;remoteSha=null;state=null;clearInterval(pollTimer);document.getElementById('tokenInput').value='';updateBanner();showConnect();toast('Disconnected. Token wiped from this browser.');}
+function disconnect(){lsDel(TOKEN_KEY);lsDel(EXP_KEY);token=null;tokenExpiry=null;authFailed=0;remoteSha=null;state=null;clearInterval(pollTimer);document.getElementById('tokenInput').value='';updateBanner();showConnect();toast('Disconnected. Token wiped from this browser.');}
 document.getElementById('connectBtn').addEventListener('click',doConnect);
 document.getElementById('tokenInput').addEventListener('keydown',e=>{if(e.key==='Enter')doConnect();});
 document.getElementById('chooseLocal').addEventListener('click',startLocal);
@@ -1168,7 +1187,7 @@ document.getElementById('legend').innerHTML=SECTION_ORDER.map(s=>'<span><span cl
     mode='github';lsSet(MODE_KEY,'github');
     const ok=await pull();
     if(ok){hideConnect();render();startPolling();}
-    else{showConnect();document.getElementById('connectErr').textContent='Saved token didn\u2019t work \u2014 it may have expired. Paste a fresh one.';}
+    else{showConnect();document.getElementById('connectErr').textContent='Saved token didn\u2019t work. '+syncErrMsg(syncErr);}
     updateBanner();return;
   }
   if(mode==='github'){showConnect();return;}

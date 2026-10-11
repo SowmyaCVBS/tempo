@@ -29,6 +29,8 @@ jobs:
           node-version: '20'
       - name: Parse-check index.html (blocks deploy on failure)
         run: node scripts/check-build.js index.html
+      - name: Sync-state tests (badge, banner, reconnect)
+        run: node --test tests/sync.test.js
 
   deploy:
     needs: check          # deploy only runs if the parse-check passed
